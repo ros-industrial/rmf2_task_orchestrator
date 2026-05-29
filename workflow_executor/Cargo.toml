@@ -1,0 +1,19 @@
+[package]
+name = "workflow_executor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+amqp = { workspace = true }
+crossflow = { workspace = true }
+crossflow_diagram_editor = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+schemars = { workspace = true }
+reqwest = { workspace = true }
+futures-timer = "3.0"
+dashmap = "6.1.0"
+rumqttc = { workspace = true }

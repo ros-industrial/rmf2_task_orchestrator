@@ -1,0 +1,17 @@
+[task_orchestrator.http]
+host = "127.0.0.1"
+port = 2727
+
+[task_orchestrator.amqp]
+host = "localhost"
+port = 5672
+
+[task_orchestrator.mqtt]
+host = "localhost"
+port = 1883
+
+[task_orchestrator.amqp.consumer]
+exchange = "@RECEIVE@"
+queue = "@RECEIVE@-rmf_schedule"
+routing_key = ""
+exchange_kind = "fanout"
