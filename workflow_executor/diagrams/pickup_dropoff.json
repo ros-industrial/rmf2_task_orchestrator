@@ -1,0 +1,31 @@
+{
+    "version": "0.1.0",
+    "start": "pickup",
+    "ops": {
+        "pickup": {
+            "type": "node",
+            "builder": "UniversalNode",
+            "config": {
+                "service_name": "pickup_service",
+                "mapping": {
+                    "robot_id": "$.payload.robot_id",
+                    "item": "$.payload.item",
+                    "location": "$.payload.pickup.location"
+                }
+            },
+            "next": "dropoff"
+        },
+        "dropoff": {
+            "type": "node",
+            "builder": "UniversalNode",
+            "config": {
+                "service_name": "navigation_service",
+                "mapping": {
+                    "robot_id": "$.payload.robot_id",
+                    "destination": "$.payload.dropoff.location"
+                }
+            },
+            "next": { "builtin": "terminate" }
+        }
+    }
+}

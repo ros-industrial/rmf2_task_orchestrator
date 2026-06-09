@@ -1,0 +1,25 @@
+# Rust
+**/target/
+*.rs.bk
+
+# Logs
+*.log
+*.txt
+debug.log
+crash*.log
+orchestrator_*.log
+rust_orchestrator.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.claude/
+
+# OS
+.DS_Store
+
+# Build artifacts
+*.so
+*.dylib
+*.dll

@@ -1,0 +1,49 @@
+{
+    "version": "0.1.0",
+    "start": "checkpoint_1",
+    "ops": {
+        "checkpoint_1": {
+            "type": "buffer",
+            "settings": { "retention": "keep_all" }
+        },
+        "listen_1": {
+            "type": "listen",
+            "buffers": ["checkpoint_1"],
+            "next": "pickup"
+        },
+        "pickup": {
+            "type": "node",
+            "builder": "UniversalNode",
+            "config": {
+                "service_name": "pickup_service",
+                "mapping": {
+                    "robot_id": "$.payload.robot_id",
+                    "item": "$.payload.item",
+                    "location": "$.payload.pickup.location"
+                }
+            },
+            "next": "checkpoint_2"
+        },
+        "checkpoint_2": {
+            "type": "buffer",
+            "settings": { "retention": "keep_all" }
+        },
+        "listen_2": {
+            "type": "listen",
+            "buffers": ["checkpoint_2"],
+            "next": "dropoff"
+        },
+        "dropoff": {
+            "type": "node",
+            "builder": "UniversalNode",
+            "config": {
+                "service_name": "navigation_service",
+                "mapping": {
+                    "robot_id": "$.payload.robot_id",
+                    "destination": "$.payload.dropoff.location"
+                }
+            },
+            "next": { "builtin": "terminate" }
+        }
+    }
+}

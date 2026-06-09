@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+  task_orchestrator:
+    container_name: task_orchestrator
+    # Use pre-built image (matches task_orchestrator_control.sh):
+    image: rmf2_task_orchestrator:latest
+    # Or build from source:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - TASK_ORCHESTRATOR__AMQP__HOST=${AMQP_HOST:-rmf2_broker-rabbitmq-1}
+      - TASK_ORCHESTRATOR__AMQP__PORT=${AMQP_PORT:-5672}
+      - TASK_ORCHESTRATOR__MQTT__HOST=${MQTT_HOST:-mosquitto}
+      - TASK_ORCHESTRATOR__MQTT__PORT=${MQTT_PORT:-1883}
+    ports:
+      - "${HTTP_PORT:-2727}:2727"
+    networks:
+      - rmf2_broker_rmf-network
+    restart: unless-stopped
+
+networks:
+  rmf2_broker_rmf-network:
+    external: true

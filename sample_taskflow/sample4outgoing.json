@@ -1,0 +1,136 @@
+{
+  "$schema": "https://raw.githubusercontent.com/open-rmf/crossflow/refs/heads/main/diagram.schema.json",
+  "version": "0.1.0",
+  "templates": {},
+  "start": "72b63364-3733-4731-bd54-3f9ac6d0bee9",
+  "ops": {
+    "a6f0bdc0-d79c-409f-94b5-5df1ea03f0d2": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": {
+        "builtin": "terminate"
+      },
+      "display_text": "AGF dropoff"
+    },
+    "56906170-5e60-4a2f-805e-5eec5acc4893": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "a6f0bdc0-d79c-409f-94b5-5df1ea03f0d2",
+      "display_text": "AGF pickup"
+    },
+    "29038f2b-2340-4fde-9219-9a26a34073fc": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "56906170-5e60-4a2f-805e-5eec5acc4893",
+      "display_text": "palletize"
+    },
+    "dd957e88-134b-4bfb-a556-b0918480a6aa": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "29038f2b-2340-4fde-9219-9a26a34073fc",
+      "display_text": "AMR3 carry"
+    },
+    "157ad367-d311-492d-9457-743796344251": {
+      "type": "join",
+      "buffers": [
+        "e9e02a47-60a5-4dc0-b7cd-c25d6f559659",
+        "702146a4-d213-4504-9691-0537e7d5ebbb"
+      ],
+      "next": "dd957e88-134b-4bfb-a556-b0918480a6aa"
+    },
+    "e9e02a47-60a5-4dc0-b7cd-c25d6f559659": {
+      "type": "buffer"
+    },
+    "702146a4-d213-4504-9691-0537e7d5ebbb": {
+      "type": "buffer"
+    },
+    "a8416524-31ff-4fca-9c1f-ba0f15353457": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "09af97df-5f43-4d24-a745-c419399d7d29",
+      "display_text": "AMR3 pickup"
+    },
+    "09af97df-5f43-4d24-a745-c419399d7d29": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "e9e02a47-60a5-4dc0-b7cd-c25d6f559659",
+      "display_text": "SnS retrieve"
+    },
+    "212ba3ba-bf2a-4389-93bb-32a1a4b3f0fe": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "702146a4-d213-4504-9691-0537e7d5ebbb",
+      "display_text": "palletize"
+    },
+    "7a18ef58-fcdd-4721-bbc8-9badea506141": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "212ba3ba-bf2a-4389-93bb-32a1a4b3f0fe",
+      "display_text": "AMR2 carry"
+    },
+    "1352aa0e-dbb0-4043-ac3e-047d34a8eddf": {
+      "type": "join",
+      "buffers": [
+        "ecec1c35-64c1-4189-a90f-14e22d4b59a7",
+        "b40becba-b7b0-4552-83c5-646ba6f0e7f4"
+      ],
+      "next": "13814454-f790-45fd-9a0c-346cefeb2a29"
+    },
+    "ecec1c35-64c1-4189-a90f-14e22d4b59a7": {
+      "type": "buffer"
+    },
+    "b40becba-b7b0-4552-83c5-646ba6f0e7f4": {
+      "type": "buffer"
+    },
+    "b9d84c2f-f423-4156-af5a-d4455c86c84e": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "a05459e9-f9b0-43e7-aa40-96c4831c316d",
+      "display_text": "AMR1 carry"
+    },
+    "33818f00-3f2b-42a4-91ea-be429b21ffa3": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "ecec1c35-64c1-4189-a90f-14e22d4b59a7",
+      "display_text": "SnS retrieve"
+    },
+    "72b63364-3733-4731-bd54-3f9ac6d0bee9": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "b672fc2e-f053-4ed6-bff6-3662d434155a",
+      "display_text": "AMR1 pickup"
+    },
+    "66b29193-d886-4a0e-a852-087ee746dffb": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "33818f00-3f2b-42a4-91ea-be429b21ffa3",
+      "display_text": "AMR2 pickup"
+    },
+    "13814454-f790-45fd-9a0c-346cefeb2a29": {
+      "type": "fork_clone",
+      "next": [
+        "7a18ef58-fcdd-4721-bbc8-9badea506141",
+        "a8416524-31ff-4fca-9c1f-ba0f15353457"
+      ]
+    },
+    "a05459e9-f9b0-43e7-aa40-96c4831c316d": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "b40becba-b7b0-4552-83c5-646ba6f0e7f4",
+      "display_text": "palletize"
+    },
+    "b672fc2e-f053-4ed6-bff6-3662d434155a": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "f410748b-0363-4e88-b63a-300acef7d5bc",
+      "display_text": "SnS retrieve"
+    },
+    "f410748b-0363-4e88-b63a-300acef7d5bc": {
+      "type": "fork_clone",
+      "next": [
+        "b9d84c2f-f423-4156-af5a-d4455c86c84e",
+        "66b29193-d886-4a0e-a852-087ee746dffb"
+      ]
+    }
+  }
+}

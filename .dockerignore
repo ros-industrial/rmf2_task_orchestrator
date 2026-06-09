@@ -1,0 +1,32 @@
+# Build artifacts
+target/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Log files
+*.log
+rust_orchestrator.log
+orchestrator_*.log
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Environment files (use env vars instead)
+.env*
+
+# Sample/test files
+sample_taskflow/
+
+# OS files
+.DS_Store
+Thumbs.db

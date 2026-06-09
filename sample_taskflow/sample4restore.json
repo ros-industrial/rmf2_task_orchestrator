@@ -1,0 +1,85 @@
+{
+  "$schema": "https://raw.githubusercontent.com/open-rmf/crossflow/refs/heads/main/diagram.schema.json",
+  "version": "0.1.0",
+  "templates": {},
+  "start": "e88db60c-27d1-400a-ab10-4c4c67c01bde",
+  "ops": {
+    "bdbf9082-0105-4196-b418-7dffe32ad1f2": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "bf3fbf94-aa41-4f50-866f-f52bf8b10aba",
+      "display_text": "SnS1 retrieve"
+    },
+    "a2e5ebb1-d2c7-4fec-8588-069e4847a6f3": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "1084f315-4686-47b6-970d-26c96eaea344",
+      "display_text": "AMR1 carry"
+    },
+    "53c459cc-a75b-48cb-b76e-94979d54bdb2": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "bdbf9082-0105-4196-b418-7dffe32ad1f2",
+      "display_text": "AMR1 pickup"
+    },
+    "e88db60c-27d1-400a-ab10-4c4c67c01bde": {
+      "type": "fork_clone",
+      "next": [
+        "53c459cc-a75b-48cb-b76e-94979d54bdb2"
+      ]
+    },
+    "1630ee4f-49de-4ce2-80dc-1ddaf8147396": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "299a1754-e3f0-499f-81ce-3a7900104fb8",
+      "display_text": "AMR2 pickup"
+    },
+    "bf3fbf94-aa41-4f50-866f-f52bf8b10aba": {
+      "type": "fork_clone",
+      "next": [
+        "a2e5ebb1-d2c7-4fec-8588-069e4847a6f3",
+        "1630ee4f-49de-4ce2-80dc-1ddaf8147396"
+      ]
+    },
+    "1084f315-4686-47b6-970d-26c96eaea344": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": "81df249f-d010-46b7-ae58-485cac44d997",
+      "display_text": "SnS2 store"
+    },
+    "299a1754-e3f0-499f-81ce-3a7900104fb8": {
+      "type": "node",
+      "builder": "",
+      "next": "e4729a3d-18de-4b1e-876b-c9e5f21aae3e",
+      "display_text": "SnS1 retrieve"
+    },
+    "2233f27f-2841-473c-8acf-3d7f474c39ac": {
+      "type": "node",
+      "builder": "MapfReplaceNode",
+      "next": "22f71669-aad2-4d72-97c5-ca75de14ce27",
+      "display_text": "AMR2 carry"
+    },
+    "81df249f-d010-46b7-ae58-485cac44d997": {
+      "type": "buffer"
+    },
+    "e4729a3d-18de-4b1e-876b-c9e5f21aae3e": {
+      "type": "buffer"
+    },
+    "ca213414-94f6-4b2f-a65d-2b3cc81b9f2e": {
+      "type": "join",
+      "buffers": [
+        "e4729a3d-18de-4b1e-876b-c9e5f21aae3e",
+        "81df249f-d010-46b7-ae58-485cac44d997"
+      ],
+      "next": "2233f27f-2841-473c-8acf-3d7f474c39ac"
+    },
+    "22f71669-aad2-4d72-97c5-ca75de14ce27": {
+      "type": "node",
+      "builder": "ArmNode",
+      "next": {
+        "builtin": "terminate"
+      },
+      "display_text": "SnS2 store"
+    }
+  }
+}
