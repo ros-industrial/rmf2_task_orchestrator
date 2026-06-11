@@ -15,12 +15,8 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
 reqwest = { workspace = true }
-jsonpath-rust = { workspace = true }
 futures-timer = "3.0"
-futures = "0.3"
-futures-util = "0.3"
 dashmap = "6.1.0"
 lapin = { workspace = true }
 rumqttc = { workspace = true }
-r2r = { workspace = true }
 uuid = { version = "1.19.0", features = ["v4"]}

@@ -24,18 +24,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let amqp_config = &config.task_orchestrator.amqp;
     let mqtt_config = &config.task_orchestrator.mqtt;
 
-    // Build all clients (AMQP, MQTT, ROS2)
+    // Build all clients (AMQP, MQTT)
     let clients = ClientsBuilder::new()
         .amqp(amqp_config.to_url())
         .amqp_response("@RECEIVE@", "@RECEIVE@-task-responses")
         .mqtt(&mqtt_config.host, mqtt_config.port)
         .mqtt_client_id("TaskOrchestrator-MQTT")
-        .ros2(true)
         .build()
         .await?;
 
-    // Spawn the bevy app in separate thread, also returns the diagram editor router
-    let (executor_handle, editor_router) = spawn(clients).await?;
+    // Spawn the bevy app in a separate thread; the returned editor router exposes
+    // crossflow's built-in executor at /api/executor/run (the single execution path).
+    let http_config = &config.task_orchestrator.http;
+    let executor_url = format!("http://{}:{}", http_config.host, http_config.port);
+    let (executor_handle, editor_router) = spawn(clients, executor_url).await?;
 
     // Establish a connection object for the consumer
     let amqp_connection = AmqpConnection::new(&amqp_config.to_url())
@@ -52,14 +54,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::spawn(run_consumer(amqp_connection, consumer_config, amqp_router));
 
-    // Create the http router for the executor (handles /workflow endpoints)
+    // Workflow query endpoints (/workflow/get_workflows). Execution itself goes
+    // through the editor router's built-in executor, so this only serves queries.
     let workflow_router = create_http_router(executor_handle);
 
     // Build the main http app router
     // Editor is at root because its assets use absolute paths like /static/js/...
     let app = editor_router
         .route("/health_check", get(health_check))
-        .nest("/workflow", workflow_router); // Workflow executor endpoints at /workflow
+        .nest("/workflow", workflow_router); // Workflow query endpoints at /workflow
 
     let listener = tokio::net::TcpListener::bind((
         config.task_orchestrator.http.host,

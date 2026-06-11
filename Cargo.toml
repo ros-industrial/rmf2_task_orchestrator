@@ -16,11 +16,8 @@ tracing = "0.1.43"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 schemars = "1.2.1"
 reqwest = { version = "0.12.24", features = ["json", "blocking"] }
-jsonpath-rust = "1.0.4"
 workflow_executor = { path = "workflow_executor" }
 amqp = { path = "amqp" }
 lapin = { version = "3.7.2" }
-r2r = "0.9.5"
 rumqttc = "0.25.1"
-rclrs = "0.7.0"
 chrono = "0.4.43"
