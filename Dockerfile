@@ -25,12 +25,6 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     # Git for fetching dependencies from GitHub
     git \
-    # ROS2 development tools
-    python3-colcon-common-extensions \
-    # ROS2 message packages (required by r2r for message bindings)
-    ros-humble-example-interfaces \
-    ros-humble-geometry-msgs \
-    ros-humble-std-msgs \
     # CA certificates for HTTPS
     ca-certificates \
     gnupg \
@@ -102,10 +96,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
     # For debugging/health checks
     curl \
-    # ROS2 message packages (required by r2r at runtime)
-    ros-humble-example-interfaces \
-    ros-humble-geometry-msgs \
-    ros-humble-std-msgs \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
@@ -121,7 +111,6 @@ COPY config.toml /app/
 # (CARGO_MANIFEST_DIR is baked in at compile time as /build/workflow_executor)
 # Path: /build/workflow_executor/../location_coord_map_os_res.json = /build/location_coord_map_os_res.json
 RUN mkdir -p /build/workflow_executor
-COPY location_coord_map_os_res.json /build/
 
 # Copy workflow diagrams if they exist
 COPY workflow_executor/diagrams /app/diagrams
