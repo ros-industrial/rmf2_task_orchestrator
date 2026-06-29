@@ -20,12 +20,344 @@ use crate::executor::Clients;
 use crate::mqtt::MqttHandle;
 
 use amqp::AmqpClient;
-use crossflow::{DiagramElementRegistry, NodeBuilderOptions};
+use cel::{Context, Program, Value};
+use crossflow::prelude::*;
+use crossflow::ConfigExample;
+use crossflow::bevy_app::{App, Update};
+use crossflow::bevy_ecs::prelude::{Res};
+use crossflow::bevy_time::Time;
 use futures_timer::Delay;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::{collections::HashMap, time::Duration};
+use thiserror::Error;
+
+// Register all nodes based on available clients
+pub fn register_all(
+    app: &mut App,
+    registry: &mut DiagramElementRegistry,
+    clients: &Clients,
+) {
+    let timer_service = app.spawn_continuous_service(Update, timer_countdown);
+    // Register AMQP dependent nodes
+    if let Some(amqp) = &clients.amqp {
+        register_default_node(registry);
+        register_goto_node(registry, amqp.clone());
+        register_delay_node(registry, amqp.clone());
+    }
+
+    if let Some(mqtt) = &clients.mqtt {
+        app.insert_resource(mqtt.as_ref().clone());
+        register_mqtt_device_req_node(registry, mqtt.clone());
+        register_mqtt_subscribe_node(registry, timer_service);
+        register_mqtt_publish_node(registry);
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, Error)]
+pub enum MqttNodeError {
+    #[error("MQTT subscribe error: {0}")]
+    Subscribe(String),
+    #[error("MQTT publish error: {0}")]
+    Publish(String),
+    #[error("Parse failed: {0}")]
+    Parse(String),
+    #[error("Timeout on {topic}")]
+    Timeout {
+        topic: String,
+    },
+    #[error("Condition error: {0}")]
+    Condition(String),
+    #[error("Unknown error")]
+    Unknown,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Default)]
+struct CelConditionEvalConfig {
+    #[serde(default)]
+    pub condition: String,
+}
+
+fn register_cel_eval_condition_node(
+    registry: &mut DiagramElementRegistry) {
+        registry.register_node_builder(
+            NodeBuilderOptions::new("CELCondition")
+            .with_default_display_text("CEL Condition")
+            .with_description("Evaluates a bool condition. If true, returns Ok, else returns Err.
+                Input message will pass through the node")
+            .with_config_examples([
+                ConfigExample::new(
+                    "Evaluation condition is message's status field. returns true if COMPLETED or FAILED", 
+            CelConditionEvalConfig {
+                condition: "message.status == 'COMPLETED' || message.status == 'FAILED'".into(),
+            })
+            ]),
+            |builder, config: CelConditionEvalConfig | {
+                let condition = config.condition;
+                builder.create_map_block(move | request: JsonMessage| {
+                    if condition.is_empty() {
+                        return Ok(request);
+                    }
+                    match eval_condition(&condition, &request) {
+                        Ok(true) => Ok(request),
+                        Ok(false) => Err(request),
+                        Err(e) => Err(serde_json::json!({"error": e})),
+                    }
+                })
+            }
+        )
+        .with_result();
+    }
+
+fn eval_condition(
+    condition: &str, message: &JsonMessage) -> Result<bool, String> {
+    let program = Program::compile(condition)
+        .map_err(|e| format!("CEL compile error: {e}"))?;
+    let mut context = Context::default();
+    context.add_variable("message", message.clone())
+        .map_err(|e| format!("CEL context error: {e}"))?;
+    match program.execute(&context) {
+        Ok(Value::Bool(b)) => Ok(b),
+        Ok(_) => Err(format!("CEL condition must return bool")),
+        Err(e) => Err(format!("CEL evaluation error: {e}")),
+    }
+} 
+
+/// Timer service. Will be used for timeout for nodes (Fork clone race condition)
+fn  timer_countdown(
+    service: ContinuousService<((), BufferKey<f32>), ()>,
+    mut query: ContinuousQuery<((), BufferKey<f32>), ()>,
+    mut remaining_time_access: BufferAccessMut<f32>,
+    time: Res<Time>,
+) {
+    let Some(mut requests) = query.get_mut(&service.key) else {
+        return;
+    };
+    requests.for_each(|order| {
+        let time_key = &order.request().1;
+        let id = order.id();
+        let Ok(mut remaining_time) = remaining_time_access.get_mut(id, time_key) else {
+            return;
+        };
+        let Some(mut t) = remaining_time.newest_mut() else {
+            return;
+        };
+
+        *t -= time.delta_secs();
+        if *t <= 0.0 {
+            order.respond(());
+        }
+    });
+}
+
+#[derive(Serialize, Deserialize, Clone, JsonSchema, Default)]
+struct MqttPublishConfig {
+    #[serde(default)]
+    pub topic: String,
+    #[serde(default)]
+    pub payload: Option<JsonMessage>,
+    #[serde(default = "default_qos")]
+    pub qos: u8,
+    #[serde(default)]
+    pub retain: bool,
+}
+
+fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry) {
+    registry
+        .register_node_builder(
+            NodeBuilderOptions::new("MqttPublish")
+                .with_default_display_text("MQTT Publish")
+                .with_description("Publish a message to a MQTT topic. If no payload specified in config, pull from upstream request")
+                .with_config_examples([
+                    ConfigExample::new(
+                        "Publish with config payload",
+                        MqttPublishConfig {
+                            topic: "asset/ManipulatorRobot1/task_request".into(),
+                            payload: Some(serde_json::json!({
+                                "task_id" : "urn:id-15234",
+                                "task_type": "Depalletize",
+                                "task_command": "START",
+                                "asset_id" : "ManipulatorRobot1"
+                            })),
+                            qos: 0,
+                            retain: true,
+                        }
+                    )
+                ]),
+            |builder, config: MqttPublishConfig | {
+                mqtt_publish_node(builder, config)
+            },
+        )
+        .with_result();
+}
+
+fn mqtt_publish_node(
+    builder: &mut Builder,
+    config: MqttPublishConfig
+) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
+    let MqttPublishConfig {topic, payload, qos, retain } = config;
+    let callback =  move |
+    Async { request, ..}: Async<JsonMessage>,
+    mqtt_handle: Res<MqttHandle>,
+    | {
+        let topic = topic.clone();
+        let payload = payload.clone();
+        let mqtt = mqtt_handle.clone();
+        async move {
+            let data = if let Some(ref msg) = payload {
+                serde_json::to_vec(msg)
+            } else {
+                // If no payload in config, pull payload from upstream
+                tracing::warn!("MqttPublish: no config payload, publishing upstream input");
+                serde_json::to_vec(&request)
+            }.map_err(|e| MqttNodeError::Parse(e.to_string()))?;
+
+            mqtt.publish(&topic, data, qos, retain)
+                .await
+                .map_err(|e| MqttNodeError::Publish(e.to_string()))?;
+            tracing::debug!("MqttPublish: published to {}", topic);
+            let output = payload.unwrap_or(request);
+            Ok(output)
+        }
+    };
+    builder.create_node(callback.into_callback())
+}
+
+#[derive(Serialize, Deserialize, Clone, JsonSchema, Default)]
+struct MqttSubscribeConfig {
+    #[serde(default)]
+    pub topic: String,
+    #[serde(default)]
+    pub condition: String,
+    #[serde(default = "default_timeout")]
+    pub timeout_secs: f32,
+    #[serde(default = "default_qos")]
+    pub qos: u8,
+}
+
+fn default_timeout() -> f32 {
+    30.0
+}
+
+fn default_qos() -> u8 {
+    0
+}
+
+fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_service:
+  Service<((), BufferKey<f32>), ()>) {
+      registry
+          .register_node_builder(
+              NodeBuilderOptions::new("MqttSubscribe")
+                  .with_default_display_text("MQTT Subscribe and wait")
+                  .with_description("Subscribe to an MQTT topic and wait for a CEL condition")
+                  .with_config_examples([
+                      ConfigExample::new(
+                          "Wait for device to be IDLE",
+                          MqttSubscribeConfig {
+                              topic: "asset/ManipulatorRobot1/asset_status".into(),
+                              condition: "message.state == 'IDLE'".into(),
+                              ..Default::default()
+                          },
+                      ),
+                      ConfigExample::new(
+                          "Wait for task completion or failure",
+                          MqttSubscribeConfig {
+                              topic: "asset/ManipulatorRobot1/task_status".into(),
+                              condition: "message.status == 'COMPLETED' || message.status == 
+  'FAILED'".into(),
+                              timeout_secs: 300.0,
+                              ..Default::default()
+                          },
+                      ),
+                  ]),
+              move |builder, config: MqttSubscribeConfig| {
+                  mqtt_subscribe_node(builder, config, timer_service)
+              },
+          )
+          .with_result();
+  }
+
+fn mqtt_subscribe_node(
+    builder: &mut Builder,
+    config: MqttSubscribeConfig,
+    timer_service: Service<((), BufferKey<f32>), ()>
+) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
+    let MqttSubscribeConfig { topic, condition, timeout_secs, qos } = config;
+    let mqtt_topic = topic.clone();
+    // Timeout is achieved by racing the mqtt sub loop with the timeout service using a fork clone. If a message
+    // is not received during the timeout duration, 
+    builder.create_io_scope(|scope, builder| {
+        let sub_loop = mqtt_sub_loop(builder, topic, condition, qos);
+        let time_buffer: Buffer<f32> = builder.create_buffer(BufferSettings::default());
+        let buffer_access= builder.create_buffer_access(time_buffer);
+        builder
+            .chain(sub_loop.output)
+            .connect(scope.terminate);
+
+        builder
+            .chain(buffer_access.output)
+            .then(timer_service)
+            .map_block(move |_| {
+                Err(MqttNodeError::Timeout { topic: mqtt_topic.clone() })
+            })
+            .connect(scope.terminate);
+
+        builder.chain(scope.start).fork_clone((
+            |chain: Chain<_>| {
+                chain.connect(sub_loop.input);
+            },
+            |chain: Chain<_>| {
+                chain
+                    .map_block(move |_| timeout_secs)
+                    .connect(time_buffer.input_slot());
+            },
+            |chain: Chain<_>| {
+                chain
+                    .trigger()
+                    .connect(buffer_access.input);
+            },
+        ));
+    })   
+}
+
+fn mqtt_sub_loop(
+    builder: &mut Builder,
+    topic: String,
+    condition: String,
+    qos: u8,
+) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
+    let callback = move |
+    Async {request, ..}: Async<JsonMessage>,
+    mqtt_handle: Res<MqttHandle>,
+    | {
+        let topic = topic.clone();
+        let condition = condition.clone();
+        let mqtt_handle = mqtt_handle.clone();
+        async move {
+            let mut rx = mqtt_handle
+                .subscribe(&topic, qos)
+                .await
+                .map_err(|e| MqttNodeError::Subscribe(e.to_string()))?;
+
+            loop {
+                let Some(data) = rx.recv().await else {
+                    return Err(MqttNodeError::Subscribe("channel closed".into()));
+                };
+                let msg = serde_json::from_slice(&data)
+                    .map_err(|e| MqttNodeError::Parse(e.to_string()))?;
+                if condition.is_empty() {
+                    return Ok(msg);
+                }
+                if eval_condition(&condition, &msg)
+                    .map_err(MqttNodeError::Condition)? {
+                        return Ok(msg);
+                }
+            }
+        }
+    };
+    builder.create_node(callback.into_callback())
+}
 
 #[derive(Serialize)]
 struct TaskRequestPayload {
@@ -44,23 +376,6 @@ struct TaskRequestPayload {
     task_expected_end: String,
     #[serde(rename = "taskExpectedDuration")]
     task_expected_duration: String,
-}
-
-// Register all nodes based on available clients
-pub fn register_all(
-    registry: &mut DiagramElementRegistry,
-    clients: &Clients,
-) {
-    // Register AMQP dependent nodes
-    if let Some(amqp) = &clients.amqp {
-        register_default_node(registry);
-        register_goto_node(registry, amqp.clone());
-        register_delay_node(registry, amqp.clone());
-    }
-
-    if let Some(mqtt) = &clients.mqtt {
-        register_mqtt_device_req_node(registry, mqtt.clone());
-    }
 }
 
 #[derive(Deserialize, JsonSchema, Default, Clone)]
@@ -248,12 +563,12 @@ fn register_mqtt_device_req_node(
                     let response_topic = format!("asset/{}/task_status", &config.asset_id);
 
                     let mut status_rx = mqtt_client
-                        .subscribe(&status_topic)
+                        .subscribe(&status_topic, 0)
                         .await
                         .map_err(|e| format!("Failed to subscribe to {}: {e}", status_topic))?;
 
                     let mut response_rx = mqtt_client
-                        .subscribe(&response_topic)
+                        .subscribe(&response_topic, 0)
                         .await
                         .map_err(|e| format!("Failed to subscribe to {}: {e}", response_topic))?;
 
@@ -289,7 +604,7 @@ fn register_mqtt_device_req_node(
                         .map_err(|e| format!("Failed to serialize task request: {e}"))?;
 
                     mqtt_client
-                        .publish(&request_topic, payload)
+                        .publish(&request_topic, payload, 0, false)
                         .await
                         .map_err(|e| format!("Failed to publish to {}: {e}", request_topic))?;
 

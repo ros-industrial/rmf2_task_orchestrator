@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+use crossflow::bevy_ecs;
 use dashmap::DashMap;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::sync::Arc;
@@ -24,20 +25,29 @@ use tokio::sync::mpsc;
 
 pub type MqttMessage = Vec<u8>;
 
-#[derive(Clone)]
+#[derive(Clone, bevy_ecs::resource::Resource)]
 pub struct MqttHandle {
     client: AsyncClient,
     subscriptions: Arc<DashMap<String, mpsc::Sender<MqttMessage>>>,
 }
 
 impl MqttHandle {
+    fn parse_qos(qos: u8) -> QoS {
+        match qos {
+            1 => QoS::AtLeastOnce,
+            2 => QoS::ExactlyOnce,
+            _ => QoS::AtMostOnce,
+        }
+    }
+
     pub async fn subscribe(
         &self,
         topic: &str,
+        qos: u8,
     ) -> Result<mpsc::Receiver<MqttMessage>, Box<dyn std::error::Error>> {
         let (tx, rx) = mpsc::channel(32);
         self.client
-            .subscribe(topic, QoS::AtMostOnce)
+            .subscribe(topic, Self::parse_qos(qos))
             .await
             .map_err(|e| format!("Failed to subscribe to {topic} topic: {e}"))?;
         self.subscriptions.insert(topic.to_string(), tx);
@@ -48,9 +58,11 @@ impl MqttHandle {
         &self,
         topic: &str,
         payload: impl Into<Vec<u8>>,
+        qos: u8,
+        retain: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.client
-            .publish(topic, QoS::AtMostOnce, false, payload)
+            .publish(topic, Self::parse_qos(qos), retain, payload)
             .await
             .map_err(|e| format!("Failed to publish to {topic} topic: {e}"))?;
         Ok(())
