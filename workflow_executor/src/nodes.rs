@@ -52,7 +52,9 @@ pub fn register_all(
         register_mqtt_device_req_node(registry, mqtt.clone());
         register_mqtt_subscribe_node(registry, timer_service);
         register_mqtt_publish_node(registry);
+        register_mqtt_listen_node(registry);
     }
+    register_cel_eval_condition_node(registry);
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, Error)]
@@ -117,6 +119,11 @@ fn eval_condition(
     let mut context = Context::default();
     context.add_variable("message", message.clone())
         .map_err(|e| format!("CEL context error: {e}"))?;
+    if let Some(obj) = message.as_object() {
+        for (key, value) in obj {
+            let _ = context.add_variable(key, value.clone());
+        }
+    }
     match program.execute(&context) {
         Ok(Value::Bool(b)) => Ok(b),
         Ok(_) => Err(format!("CEL condition must return bool")),
@@ -153,9 +160,7 @@ fn  timer_countdown(
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, Default)]
 struct MqttPublishConfig {
-    #[serde(default)]
     pub topic: String,
-    #[serde(default)]
     pub payload: Option<JsonMessage>,
     #[serde(default = "default_qos")]
     pub qos: u8,
@@ -226,7 +231,6 @@ fn mqtt_publish_node(
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, Default)]
 struct MqttSubscribeConfig {
-    #[serde(default)]
     pub topic: String,
     #[serde(default)]
     pub condition: String,
@@ -250,7 +254,7 @@ fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_ser
           .register_node_builder(
               NodeBuilderOptions::new("MqttSubscribe")
                   .with_default_display_text("MQTT Subscribe and wait")
-                  .with_description("Subscribe to an MQTT topic and wait for a CEL condition")
+                  .with_description("Subscribe to an MQTT topic and wait for a CEL condition with a timeout.")
                   .with_config_examples([
                       ConfigExample::new(
                           "Wait for device to be IDLE",
@@ -286,7 +290,7 @@ fn mqtt_subscribe_node(
     let MqttSubscribeConfig { topic, condition, timeout_secs, qos } = config;
     let mqtt_topic = topic.clone();
     // Timeout is achieved by racing the mqtt sub loop with the timeout service using a fork clone. If a message
-    // is not received during the timeout duration, 
+    // is not received during the timeout duration, returns a timeout error.
     builder.create_io_scope(|scope, builder| {
         let sub_loop = mqtt_sub_loop(builder, topic, condition, qos);
         let time_buffer: Buffer<f32> = builder.create_buffer(BufferSettings::default());
@@ -352,6 +356,77 @@ fn mqtt_sub_loop(
                 if eval_condition(&condition, &msg)
                     .map_err(MqttNodeError::Condition)? {
                         return Ok(msg);
+                }
+            }
+        }
+    };
+    builder.create_node(callback.into_callback())
+}
+
+#[derive(StreamPack)]
+struct MqttStream {
+    pub message: JsonMessage
+}
+
+#[derive(Default, Serialize, Deserialize, JsonSchema, Clone)]
+struct MqttListenConfig {
+    pub topic: String,
+    #[serde(default = "default_qos")]
+    pub qos: u8,
+}
+
+fn register_mqtt_listen_node(
+    registry: &mut DiagramElementRegistry
+) {
+    registry
+        .register_node_builder(
+            NodeBuilderOptions::new("MqttListen")
+                .with_default_display_text("MQTT Listen")
+                .with_description("Subscribe to an MQTT topic and stream messages continuously. Connect the stream output into a buffer for downstream consumption via listen/join/buffer_access.")
+                .with_config_examples([
+                    ConfigExample::new(
+                        "Listen to device status updates",
+                        MqttListenConfig {
+                            topic: "asset/ManipulatorRobot1/asset_status".into(),
+                            ..Default::default()
+                        },
+                    ),
+                ]),
+            |builder, config: MqttListenConfig| {
+                mqtt_listen_node(builder, config)
+            },
+        )
+        .with_result();
+}
+
+fn mqtt_listen_node(
+    builder: &mut Builder,
+    config: MqttListenConfig,
+) -> Node<JsonMessage, Result<(), MqttNodeError>, MqttStream> {
+    let MqttListenConfig { topic, qos } = config;
+    let callback = move |
+        Async { streams, .. }: Async<JsonMessage, MqttStream>,
+        mqtt_handle: Res<MqttHandle>,
+    | {
+        let topic = topic.clone();
+        let mqtt = mqtt_handle.clone();
+        async move {
+            let mut rx = mqtt
+                .subscribe(&topic, qos)
+                .await
+                .map_err(|e| MqttNodeError::Subscribe(e.to_string()))?;
+
+            loop {
+                let Some(data) = rx.recv().await else {
+                    return Err(MqttNodeError::Subscribe("channel closed".into()));
+                };
+                match serde_json::from_slice(&data) {
+                    Ok(msg) => {
+                        streams.message.send(msg);
+                    }
+                    Err(e) => {
+                        tracing::warn!("MqttListen: parse error on {}: {e}", topic);
+                    }
                 }
             }
         }

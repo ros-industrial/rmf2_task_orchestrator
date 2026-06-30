@@ -1,0 +1,513 @@
+{
+  "$schema": "https://raw.githubusercontent.com/open-rmf/crossflow/refs/heads/main/diagram.schema.json",
+  "version": "0.1.0",
+  "templates": {
+    "new_template": {
+      "inputs": {
+        "new_input": "7e2597ad-42f5-4700-a70a-a257c1fd318e"
+      },
+      "outputs": [
+        "new_output"
+      ],
+      "buffers": {},
+      "ops": {
+        "7e2597ad-42f5-4700-a70a-a257c1fd318e": {
+          "type": "node",
+          "builder": "MqttSubscribe",
+          "next": "3619c285-ee4c-4c7b-8a9a-894c7c22a554"
+        },
+        "0fd60af7-f840-4838-bf93-6c96d3d59fc1": {
+          "type": "node",
+          "builder": "MqttPublish",
+          "next": {
+            "builtin": "dispose"
+          }
+        },
+        "3619c285-ee4c-4c7b-8a9a-894c7c22a554": {
+          "type": "fork_result",
+          "err": "7e2597ad-42f5-4700-a70a-a257c1fd318e",
+          "ok": "31075fad-b685-4db6-97f9-a4390cf95299"
+        },
+        "31075fad-b685-4db6-97f9-a4390cf95299": {
+          "type": "fork_clone",
+          "next": [
+            "0fd60af7-f840-4838-bf93-6c96d3d59fc1"
+          ]
+        }
+      }
+    },
+    "new_template_1": {
+      "inputs": {},
+      "outputs": [],
+      "buffers": {},
+      "ops": {}
+    },
+    "new_template_2": {
+      "inputs": {},
+      "outputs": [],
+      "buffers": {},
+      "ops": {}
+    }
+  },
+  "start": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
+  "ops": {
+    "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a": {
+      "type": "node",
+      "builder": "MqttSubscribe",
+      "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
+      "config": {
+        "timeout_secs": 5,
+        "topic": "order/v1",
+        "condition": "message.state=='IDLE'"
+      }
+    },
+    "44950b8b-47c0-4c0d-ad1d-ffba4663e238": {
+      "type": "node",
+      "builder": "CELCondition",
+      "next": "01c47f97-0599-4f3f-a9ba-945648c346c7",
+      "config": {
+        "condition": "has(message.Timeout)"
+      }
+    },
+    "02bda6f3-499e-4808-8bfa-9455a44af70c": {
+      "type": "node",
+      "builder": "MqttPublish",
+      "next": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
+      "config": {
+        "topic": "order/v1",
+        "payload": {
+          "state": "IDLE"
+        }
+      }
+    },
+    "71580dd3-cbb5-41df-8c6e-cb728f2b2f65": {
+      "type": "fork_result",
+      "err": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
+      "ok": {
+        "builtin": "terminate"
+      }
+    },
+    "427452e0-7ef7-4635-ae37-705ac5bbe5c5": {
+      "type": "fork_clone",
+      "next": [
+        "02bda6f3-499e-4808-8bfa-9455a44af70c",
+        "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a"
+      ]
+    },
+    "01c47f97-0599-4f3f-a9ba-945648c346c7": {
+      "type": "fork_result",
+      "err": {
+        "builtin": "terminate"
+      },
+      "ok": "427452e0-7ef7-4635-ae37-705ac5bbe5c5"
+    },
+    "de856421-c323-43c2-b7a4-a3d2bf93fc83": {
+      "type": "buffer"
+    }
+  },
+  "description": "Simple diagram showcasing the mqtt pub/sub nodes w/ a CEL condition node.\n \n1. Sub node subscribes to the \"order/v1\" topic with a timeout of 5s and waits for a state == IDLE condition.\n2. If Ok, terminates the workflow else, goes through the Err branch.\n3. If Err output is Timeout, retry the subscriber node and publish \"state\":\"IDLE\" to \"order/v1\".\n\nThe workflow will timeout once -> go through the error branch and retry -> go through the Ok branch -> Terminate workflow  ",
+  "input_examples": [],
+  "script_environments": {},
+  "extensions": {
+    "crossflow-diagram-editor-v1": {
+      "hash": "762b8e95afce437f35462246c44bd8b3a83fe432",
+      "state": {
+        "nodes": [
+          {
+            "id": ":__builtin_start__",
+            "type": "start",
+            "position": {
+              "x": 225,
+              "y": 25
+            },
+            "selectable": false,
+            "data": {
+              "namespace": ""
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false
+          },
+          {
+            "id": ":__builtin_terminate__",
+            "type": "terminate",
+            "position": {
+              "x": 100,
+              "y": 525
+            },
+            "selectable": false,
+            "data": {
+              "namespace": ""
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false,
+            "dragging": false
+          },
+          {
+            "id": "bf93ac0e-22b9-41fe-b313-74e4f582e4b0",
+            "type": "node",
+            "position": {
+              "x": 225,
+              "y": 125
+            },
+            "data": {
+              "namespace": "",
+              "opId": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
+              "op": {
+                "type": "node",
+                "builder": "MqttSubscribe",
+                "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
+                "config": {
+                  "timeout_secs": 5,
+                  "topic": "order/v1",
+                  "condition": "message.state=='IDLE'"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false,
+            "dragging": false
+          },
+          {
+            "id": "9280cf0c-55ed-43b0-b372-f66b2b4178b9",
+            "type": "node",
+            "position": {
+              "x": 225,
+              "y": 325
+            },
+            "data": {
+              "namespace": "",
+              "opId": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
+              "op": {
+                "type": "node",
+                "builder": "CELCondition",
+                "next": "01c47f97-0599-4f3f-a9ba-945648c346c7",
+                "config": {
+                  "condition": "has(message.Timeout)"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false,
+            "dragging": false
+          },
+          {
+            "id": "d526adf4-021b-44bc-9ddc-2411c09b5682",
+            "type": "node",
+            "position": {
+              "x": 350,
+              "y": 625
+            },
+            "data": {
+              "namespace": "",
+              "opId": "02bda6f3-499e-4808-8bfa-9455a44af70c",
+              "op": {
+                "type": "node",
+                "builder": "MqttPublish",
+                "next": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
+                "config": {
+                  "topic": "order/v1",
+                  "payload": {
+                    "state": "IDLE"
+                  }
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false,
+            "dragging": false
+          },
+          {
+            "id": "16c070d5-8bb1-4776-bc23-e2a0c5af5dd0",
+            "type": "fork_result",
+            "position": {
+              "x": 157.5,
+              "y": 225
+            },
+            "data": {
+              "namespace": "",
+              "opId": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
+              "op": {
+                "type": "fork_result",
+                "err": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
+                "ok": {
+                  "builtin": "terminate"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false,
+            "dragging": false
+          },
+          {
+            "id": "28b91737-647d-4662-a637-70777079516b",
+            "type": "fork_clone",
+            "position": {
+              "x": 350,
+              "y": 525
+            },
+            "data": {
+              "namespace": "",
+              "opId": "427452e0-7ef7-4635-ae37-705ac5bbe5c5",
+              "op": {
+                "type": "fork_clone",
+                "next": [
+                  "02bda6f3-499e-4808-8bfa-9455a44af70c",
+                  "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a"
+                ]
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false,
+            "dragging": false
+          },
+          {
+            "id": "832d1311-13f3-403f-8f05-aa277fd48c56",
+            "type": "fork_result",
+            "position": {
+              "x": 225,
+              "y": 425
+            },
+            "data": {
+              "namespace": "",
+              "opId": "01c47f97-0599-4f3f-a9ba-945648c346c7",
+              "op": {
+                "type": "fork_result",
+                "err": {
+                  "builtin": "terminate"
+                },
+                "ok": "427452e0-7ef7-4635-ae37-705ac5bbe5c5"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false,
+            "dragging": false
+          },
+          {
+            "id": "0be4b2a4-c354-4d48-a687-21a611d9ee22",
+            "type": "buffer",
+            "position": {
+              "x": 350,
+              "y": 725
+            },
+            "data": {
+              "namespace": "",
+              "opId": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
+              "op": {
+                "type": "buffer"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false,
+            "dragging": false
+          }
+        ],
+        "edges": [
+          {
+            "id": "2440358d-6eeb-475f-a7b5-e3518f56e176",
+            "source": ":__builtin_start__",
+            "target": "bf93ac0e-22b9-41fe-b313-74e4f582e4b0",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            },
+            "selected": false
+          },
+          {
+            "id": "2adf0153-98d5-4adc-8ab5-c5188cdde918",
+            "source": "bf93ac0e-22b9-41fe-b313-74e4f582e4b0",
+            "target": "16c070d5-8bb1-4776-bc23-e2a0c5af5dd0",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            },
+            "selected": false
+          },
+          {
+            "id": "b9224009-12bd-4d0c-99ce-4b7bf00ec513",
+            "source": "16c070d5-8bb1-4776-bc23-e2a0c5af5dd0",
+            "sourceHandle": "forkResultErr",
+            "target": "9280cf0c-55ed-43b0-b372-f66b2b4178b9",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultErr",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            },
+            "selected": false
+          },
+          {
+            "id": "ca239f33-5807-406f-9bd0-bc234db40877",
+            "source": "832d1311-13f3-403f-8f05-aa277fd48c56",
+            "sourceHandle": "forkResultOk",
+            "target": "28b91737-647d-4662-a637-70777079516b",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultOk",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "a95dacc8-b50b-49d3-a23f-0fca9dd8ec4a",
+            "source": "28b91737-647d-4662-a637-70777079516b",
+            "target": "d526adf4-021b-44bc-9ddc-2411c09b5682",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "aa454419-3eae-4f7f-ade4-f5d00a484534",
+            "source": "28b91737-647d-4662-a637-70777079516b",
+            "target": "bf93ac0e-22b9-41fe-b313-74e4f582e4b0",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "bdda26a0-b5e7-4ccc-a2d7-797f95c0ec1c",
+            "source": "16c070d5-8bb1-4776-bc23-e2a0c5af5dd0",
+            "sourceHandle": "forkResultOk",
+            "target": ":__builtin_terminate__",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultOk",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "d7a9b8a6-ad70-4590-93eb-b7d7fedb5ed2",
+            "source": "832d1311-13f3-403f-8f05-aa277fd48c56",
+            "sourceHandle": "forkResultErr",
+            "target": ":__builtin_terminate__",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultErr",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "b0648b74-a396-445f-ae25-a7519bbf0607",
+            "source": "d526adf4-021b-44bc-9ddc-2411c09b5682",
+            "target": "0be4b2a4-c354-4d48-a687-21a611d9ee22",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "ef13eb03-9194-4e24-95f4-c7613b1383e2",
+            "source": "9280cf0c-55ed-43b0-b372-f66b2b4178b9",
+            "target": "832d1311-13f3-403f-8f05-aa277fd48c56",
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
