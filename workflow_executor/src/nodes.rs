@@ -257,7 +257,7 @@ fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_ser
   Service<((), BufferKey<f32>), ()>) {
       registry
           .register_node_builder(
-              NodeBuilderOptions::new("MqttSubscribe")
+              NodeBuilderOptions::new("MqttSubscribeAndWait")
                   .with_default_display_text("MQTT Subscribe and wait")
                   .with_description("Subscribe to an MQTT topic and wait for a CEL condition with a timeout.")
                   .with_config_examples([
