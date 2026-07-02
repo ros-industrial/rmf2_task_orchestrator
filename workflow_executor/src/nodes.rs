@@ -235,7 +235,7 @@ fn mqtt_publish_node(
 }
 
 #[derive(Serialize, Deserialize, Clone, JsonSchema, Default)]
-struct MqttSubscribeConfig {
+struct MqttSubscribeAndWaitConfig {
     pub topic: String,
     #[serde(default)]
     pub condition: String,
@@ -263,7 +263,7 @@ fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_ser
                   .with_config_examples([
                       ConfigExample::new(
                           "Wait for device to be IDLE",
-                          MqttSubscribeConfig {
+                          MqttSubscribeAndWaitConfig {
                               topic: "asset/ManipulatorRobot1/asset_status".into(),
                               condition: "message.state == 'IDLE'".into(),
                               ..Default::default()
@@ -271,7 +271,7 @@ fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_ser
                       ),
                       ConfigExample::new(
                           "Wait for task completion or failure",
-                          MqttSubscribeConfig {
+                          MqttSubscribeAndWaitConfig {
                               topic: "asset/ManipulatorRobot1/task_status".into(),
                               condition: "message.status == 'COMPLETED' || message.status == 
   'FAILED'".into(),
@@ -280,7 +280,7 @@ fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_ser
                           },
                       ),
                   ]),
-              move |builder, config: MqttSubscribeConfig| {
+              move |builder, config: MqttSubscribeAndWaitConfig| {
                   mqtt_subscribe_node(builder, config, timer_service)
               },
           )
@@ -289,10 +289,10 @@ fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_ser
 
 fn mqtt_subscribe_node(
     builder: &mut Builder,
-    config: MqttSubscribeConfig,
+    config: MqttSubscribeAndWaitConfig,
     timer_service: Service<((), BufferKey<f32>), ()>
 ) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
-    let MqttSubscribeConfig { topic, condition, timeout_secs, qos } = config;
+    let MqttSubscribeAndWaitConfig { topic, condition, timeout_secs, qos } = config;
     let mqtt_topic = topic.clone();
     // Timeout is achieved by racing the mqtt sub loop with the timeout service using a fork clone. If a message
     // is not received during the timeout duration, returns a timeout error.
@@ -910,7 +910,7 @@ mod tests {
             "ops": {
                 "subscribe": {
                     "type": "node",
-                    "builder": "MqttSubscribe",
+                    "builder": "MqttSubscribeAndWait",
                     "config": {
                         "topic": "test/sub",
                         "condition": "status == 'OK'",
@@ -931,7 +931,7 @@ mod tests {
         let result = ctx.command(|cmds| {
             sub_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
         });
-        assert!(result.is_ok(), "MqttSubscribe diagram build failed: {:?}", result.err());
+        assert!(result.is_ok(), "MqttSubscribeAndWait diagram build failed: {:?}", result.err());
 
         let listen_diagram = Diagram::from_json(json!({
             "version": "0.1.0",
@@ -1078,7 +1078,7 @@ mod tests {
                 },
                 "subscribe": {
                     "type": "node",
-                    "builder": "MqttSubscribe",
+                    "builder": "MqttSubscribeAndWait",
                     "config": {
                         "topic": "test/pub_sub",
                         "condition": "status == 'OK'",

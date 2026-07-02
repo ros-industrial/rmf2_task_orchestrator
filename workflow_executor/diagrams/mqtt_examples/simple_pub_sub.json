@@ -13,7 +13,7 @@
       "ops": {
         "7e2597ad-42f5-4700-a70a-a257c1fd318e": {
           "type": "node",
-          "builder": "MqttSubscribe",
+          "builder": "MqttSubscribeAndWait",
           "next": "3619c285-ee4c-4c7b-8a9a-894c7c22a554"
         },
         "0fd60af7-f840-4838-bf93-6c96d3d59fc1": {
@@ -53,7 +53,7 @@
   "ops": {
     "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a": {
       "type": "node",
-      "builder": "MqttSubscribe",
+      "builder": "MqttSubscribeAndWait",
       "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
       "config": {
         "timeout_secs": 5,
@@ -160,7 +160,7 @@
               "opId": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
               "op": {
                 "type": "node",
-                "builder": "MqttSubscribe",
+                "builder": "MqttSubscribeAndWait",
                 "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
                 "config": {
                   "timeout_secs": 5,
