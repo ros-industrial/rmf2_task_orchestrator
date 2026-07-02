@@ -55,6 +55,7 @@ pub fn register_all(
         register_mqtt_listen_node(registry);
     }
     register_cel_eval_condition_node(registry);
+    register_consume_message_node(registry);
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, Error)]
@@ -112,6 +113,9 @@ fn register_cel_eval_condition_node(
         .with_result();
     }
 
+/// Evaluates a message with a condition.
+/// For evaluating a JSON obj, eg. {"Err":{"Timeout": {"Code": 404}}}, can be written as Err.Timeout.Code == 404 instead of message.Err.Timeout.Code == 404
+/// If it is a primitive, will still be referred to by the message var eg. message == 40. For a list, will require index eg. message[0] == 404
 fn eval_condition(
     condition: &str, message: &JsonMessage) -> Result<bool, String> {
     let program = Program::compile(condition)
@@ -119,6 +123,7 @@ fn eval_condition(
     let mut context = Context::default();
     context.add_variable("message", message.clone())
         .map_err(|e| format!("CEL context error: {e}"))?;
+    // If message is a JSON object we flatten it so that the user does not need to know about the message variable.
     if let Some(obj) = message.as_object() {
         for (key, value) in obj {
             let _ = context.add_variable(key, value.clone());
@@ -332,7 +337,7 @@ fn mqtt_sub_loop(
     qos: u8,
 ) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
     let callback = move |
-    Async {request, ..}: Async<JsonMessage>,
+    Async {..}: Async<JsonMessage>,
     mqtt_handle: Res<MqttHandle>,
     | {
         let topic = topic.clone();
@@ -432,6 +437,35 @@ fn mqtt_listen_node(
         }
     };
     builder.create_node(callback.into_callback())
+}
+
+#[derive(Accessor, Clone)]
+struct ConsumeMessageKey
+{
+    message: BufferKey<JsonMessage>
+}
+
+fn consume_message(
+    Blocking {request: keys, id, .. }: Blocking<ConsumeMessageKey>,
+    mut message_access: BufferAccess<JsonMessage>,
+) -> Result<JsonMessage,()> {
+    let msg = message_access.get_newest(id, &keys.message)
+        .ok_or(())?;
+    Ok(msg.clone())
+}
+
+fn register_consume_message_node(registry: &mut DiagramElementRegistry) {
+    registry
+        .opt_out()
+        .no_serializing()
+        .no_deserializing()
+        .register_node_builder(
+            NodeBuilderOptions::new("ConsumeMessage")
+                .with_description("Generic consumer used to consume JSON msgs from buffers"),
+            |builder, _config: ()| builder.create_node(consume_message.into_callback()),
+        )
+        .with_listen()
+        .with_result();
 }
 
 #[derive(Serialize)]
@@ -812,4 +846,267 @@ fn register_goto_node(
             })
         },
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use crossflow::{Diagram, DiagramElementRegistry, testing::*};
+    use crate::mqtt::{mqtt_setup};
+    use serde_json::json;
+    use super::*;
+
+    // MQTT nodes tests. When the project restructure and MQTT handle refactor is eventually done, 
+    // this would preferably be self contained inside mqtt.rs. Will need to refactor the MQTT API
+    fn register_nodes(app: &mut App, registry: &mut DiagramElementRegistry) {
+        let mqtt_handle = mqtt_setup("test-client", "localhost", 1883).expect(
+            "Mosquitto must be running for MQTT setup"
+        );
+        app.insert_resource(mqtt_handle.clone());
+        let timer_service = app.spawn_continuous_service(Update, timer_countdown);
+        register_mqtt_listen_node(registry);
+        register_mqtt_publish_node(registry);
+        register_mqtt_subscribe_node(registry, timer_service);
+        register_consume_message_node(registry);
+    }
+
+    #[tokio::test]
+    async fn test_mqtt_diagram_builds() {
+        let mut ctx = TestingContext::minimal_plugins();
+        let mut registry = DiagramElementRegistry::new();
+        register_nodes(&mut ctx.app, &mut registry);
+
+        let pub_diagram = Diagram::from_json(json!({
+            "version": "0.1.0",
+            "start": "publish",
+            "ops": {
+                "publish": {
+                    "type": "node",
+                    "builder": "MqttPublish",
+                    "config": {
+                        "topic": "test/pub",
+                        "payload": { "msg": "hello" },
+                        "qos": 0,
+                        "retain": false
+                    },
+                    "next": "result"
+                },
+                "result": {
+                    "type": "fork_result",
+                    "ok": { "builtin": "terminate" },
+                    "err": { "builtin": "terminate" }
+                }
+            }
+        }))
+        .unwrap();
+
+        let result = ctx.command(|cmds| {
+            pub_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+        });
+        assert!(result.is_ok(), "MqttPublish diagram build failed: {:?}", result.err());
+
+        let sub_diagram = Diagram::from_json(json!({
+            "version": "0.1.0",
+            "start": "subscribe",
+            "ops": {
+                "subscribe": {
+                    "type": "node",
+                    "builder": "MqttSubscribe",
+                    "config": {
+                        "topic": "test/sub",
+                        "condition": "status == 'OK'",
+                        "timeout_secs": 5,
+                        "qos": 0
+                    },
+                    "next": "result"
+                },
+                "result": {
+                    "type": "fork_result",
+                    "ok": { "builtin": "terminate" },
+                    "err": { "builtin": "terminate" }
+                }
+            }
+        }))
+        .unwrap();
+
+        let result = ctx.command(|cmds| {
+            sub_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+        });
+        assert!(result.is_ok(), "MqttSubscribe diagram build failed: {:?}", result.err());
+
+        let listen_diagram = Diagram::from_json(json!({
+            "version": "0.1.0",
+            "start": "listen",
+            "ops": {
+                "listen": {
+                    "type": "node",
+                    "builder": "MqttListen",
+                    "config": {
+                        "topic": "test/listen",
+                        "qos": 0
+                    },
+                    "stream_out": {
+                        "message": "msg_buffer"
+                    },
+                    "next": { "builtin": "dispose" }
+                },
+                "msg_buffer": {
+                    "type": "buffer"
+                }
+            }
+        }))
+        .unwrap();
+
+        let result = ctx.command(|cmds| {
+            listen_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+        });
+        assert!(result.is_ok(), "MqttListen diagram build failed: {:?}", result.err());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_mqtt_listen() {
+        let mut ctx = TestingContext::minimal_plugins();
+        let mut registry = DiagramElementRegistry::new();
+        register_nodes(&mut ctx.app, &mut registry);
+
+        // MqttListen streams into a buffer; listen detects buffer change;
+        // ConsumeMessage reads from buffer and terminates.
+        // Publish runs in parallel to send a message on the same topic.
+        let diagram = Diagram::from_json(json!({
+            "version": "0.1.0",
+            "start": "fork",
+            "ops": {
+                "fork": {
+                    "type": "fork_clone",
+                    "next": ["mqtt_listen", "publish"]
+                },
+                "mqtt_listen": {
+                    "type": "node",
+                    "builder": "MqttListen",
+                    "config": {
+                        "topic": "test/listen",
+                        "qos": 0
+                    },
+                    "stream_out": {
+                        "message": "msg_buffer"
+                    },
+                    "next": { "builtin": "dispose" }
+                },
+                "msg_buffer": {
+                    "type": "buffer"
+                },
+                "watch": {
+                    "type": "listen",
+                    "buffers": {
+                        "message": "msg_buffer"
+                    },
+                    "next": "consume"
+                },
+                "consume": {
+                    "type": "node",
+                    "builder": "ConsumeMessage",
+                    "next": "consume_result"
+                },
+                "consume_result": {
+                    "type": "fork_result",
+                    "ok": { "builtin": "terminate" },
+                    "err": { "builtin": "dispose" }
+                },
+                "publish": {
+                    "type": "node",
+                    "builder": "MqttPublish",
+                    "config": {
+                        "topic": "test/listen",
+                        "payload": { "sensor": "temperature", "value": 42 },
+                        "qos": 0,
+                        "retain": true
+                    },
+                    "next": "pub_result"
+                },
+                "pub_result": {
+                    "type": "fork_result",
+                    "ok": { "builtin": "dispose" },
+                    "err": { "builtin": "dispose" }
+                }
+            }
+        }))
+        .unwrap();
+
+        let service = ctx.command(|cmds| {
+            diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+        }).expect("MqttListen diagram build failed");
+
+        let mut outcome = ctx.command(|cmds| {
+            cmds.request(json!({}), service).outcome()
+        });
+
+        let finished = ctx.run_with_conditions(&mut outcome, FlushConditions::new().with_timeout(Duration::from_secs(5)));
+        assert!(finished, "MqttListen test timed out, msg never arrived in buffer");
+        ctx.assert_no_errors();
+        let result: JsonMessage = outcome.try_recv().unwrap().unwrap();
+        assert_eq!(result, json!({"sensor": "temperature", "value": 42}));
+    }
+
+    #[tokio::test]
+    async fn test_mqtt_pub_sub() {
+        let mut ctx = TestingContext::minimal_plugins();
+        let mut registry = DiagramElementRegistry::new();
+        register_nodes(&mut ctx.app, &mut registry);
+
+        let diagram = Diagram::from_json(json!({
+            "version": "0.1.0",
+            "start": "fork",
+            "ops": {
+                "fork": {
+                    "type": "fork_clone",
+                    "next": ["publish", "subscribe"]
+                },
+                "publish": {
+                    "type": "node",
+                    "builder": "MqttPublish",
+                    "config": {
+                        "topic": "test/pub_sub",
+                        "payload": { "status": "OK" },
+                        "qos": 0,
+                        "retain": false
+                    },
+                    "next": "pub_result"
+                },
+                "pub_result": {
+                    "type": "fork_result",
+                    "ok": { "builtin": "terminate" },
+                    "err": { "builtin": "terminate" }
+                },
+                "subscribe": {
+                    "type": "node",
+                    "builder": "MqttSubscribe",
+                    "config": {
+                        "topic": "test/pub_sub",
+                        "condition": "status == 'OK'",
+                        "timeout_secs": 5,
+                        "qos": 0
+                    },
+                    "next": "sub_result"
+                },
+                "sub_result": {
+                    "type": "fork_result",
+                    "ok": { "builtin": "terminate" },
+                    "err": { "builtin": "terminate" }
+                }
+            }
+        }))
+        .unwrap();
+
+        let service = ctx.command(|cmds| {
+            diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+        }).expect("Diagram build failed");
+
+        let mut outcome = ctx.command(|cmds| {
+            cmds.request(json!({}), service).outcome()
+        });
+
+        ctx.run_while_pending(&mut outcome);
+        ctx.assert_no_errors();
+        let result: JsonMessage = outcome.try_recv().unwrap().unwrap();
+        assert_eq!(result, json!({"status": "OK"}));
+    }
 }
