@@ -86,7 +86,7 @@ impl AmqpRouter {
     pub fn route<F, Fut>(mut self, routing_key: &str, handler: F) -> Self
     where
         F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = HandlerResult> + Send + 'static, // Future can be shared among threads
+        Fut: Future<Output = HandlerResult> + Send + 'static,
     {
         let handler: HandlerFn = Arc::new(move |data| Box::pin(handler(data)));
         self.handlers.insert(routing_key.to_string(), handler);
@@ -159,12 +159,11 @@ pub async fn run_consumer(
     Ok(())
 }
 
+// Loop for redirecting the amqp data to the handler functions
 async fn consumer_loop(mut consumer: Consumer, handler: HandlerFn, routing_key: String) {
-    // Loop for redirecting the amqp data to the handler functions
     while let Some(delivery) = consumer.next().await {
         match delivery {
             Ok(delivery) => {
-                // Filter: only process Schedule messages, skip TaskRequest/TaskStatus etc.
                 if let Ok(peek) = serde_json::from_slice::<serde_json::Value>(&delivery.data) {
                     if peek.get("type").and_then(|t| t.as_str()) != Some("Schedule") {
                         let _ = delivery.ack(BasicAckOptions::default()).await;
@@ -176,7 +175,6 @@ async fn consumer_loop(mut consumer: Consumer, handler: HandlerFn, routing_key: 
                 let handler = handler.clone();
                 tracing::debug!("[{}] Received {} bytes", routing_key, delivery.data.len());
 
-                // Spawn handler in separate task to allow concurrent message processing
                 tokio::spawn(async move {
                     match handler(delivery.data.clone()).await {
                         Ok(()) => {
@@ -299,7 +297,6 @@ impl AmqpClient {
         while let Some(delivery) = consumer.next().await {
             match delivery {
                 Ok(delivery) => {
-                    // Try to parse as TaskStatus to extract the task_id
                     if let Ok(msg) = serde_json::from_slice::<serde_json::Value>(&delivery.data) {
                         let msg_type = msg.get("type").and_then(|t| t.as_str());
                         let msg_id = msg.get("id").and_then(|id| id.as_str());
@@ -314,7 +311,6 @@ impl AmqpClient {
 
                         if msg_type == Some("TaskStatus") {
                             if let Some(full_id) = msg_id {
-                                // Extract task_id from "uuid:TaskStatus" format
                                 let task_id = full_id.trim_end_matches(":TaskStatus");
 
                                 tracing::debug!(
@@ -323,7 +319,6 @@ impl AmqpClient {
                                     status
                                 );
 
-                                // Signal waiters on COMPLETED or ERROR
                                 if status == Some("COMPLETED") || status == Some("ERROR") {
                                     let mut pending_mutex = pending.lock().await;
                                     if let Some(senders) = pending_mutex.remove(task_id) {

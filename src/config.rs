@@ -16,7 +16,32 @@
  * limitations under the License.
  */
 
-use amqp::AmqpSettings;
+#[derive(serde::Deserialize, Clone)]
+pub struct AmqpSettings {
+    pub host: String,
+    pub port: u16,
+    pub consumer: ConsumerSettings,
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct ConsumerSettings {
+    pub exchange: String,
+    pub queue: String,
+    #[serde(default)]
+    pub routing_key: String,
+    #[serde(default = "default_exchange_kind")]
+    pub exchange_kind: String,
+}
+
+fn default_exchange_kind() -> String {
+    "topic".to_string()
+}
+
+impl AmqpSettings {
+    pub fn to_url(&self) -> String {
+        format!("amqp://{}:{}", self.host, self.port)
+    }
+}
 
 #[derive(serde::Deserialize, Clone)]
 pub struct TaskOrchestratorSettings {
@@ -49,7 +74,6 @@ pub enum Environment {
     Testing,
 }
 
-// For looking up the .env file to use
 impl Environment {
     pub fn from_env() -> Self {
         match std::env::var("MODE").as_deref() {
@@ -70,10 +94,8 @@ impl Environment {
 }
 
 pub fn load_base_configuration() -> Result<Settings, config::ConfigError> {
-    // We load up the config.toml vars first. If any env vars are set, it overwrites the config var
     let mut builder = config::Config::builder()
         .add_source(config::File::new("config.toml", config::FileFormat::Toml));
-    // If no MODE env var specified, default to .env.development
     let env = Environment::from_env();
     let env_file = env.load_env_file();
     tracing::info!("Loading configuration from env file '{}'", env_file);

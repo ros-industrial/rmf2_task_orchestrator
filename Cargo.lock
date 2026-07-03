@@ -90,19 +90,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "amqp"
-version = "0.1.0"
-dependencies = [
- "futures-lite",
- "lapin",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3029,15 +3016,25 @@ dependencies = [
 name = "rmf2_task_orchestrator"
 version = "0.1.0"
 dependencies = [
- "amqp",
  "axum",
+ "cel",
  "config",
+ "crossflow",
+ "crossflow_diagram_editor",
+ "dashmap",
  "dotenvy",
+ "futures-lite",
+ "futures-timer",
+ "lapin",
+ "reqwest",
+ "rumqttc",
+ "schemars 1.2.1",
  "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-subscriber",
- "workflow_executor",
 ]
 
 [[package]]
