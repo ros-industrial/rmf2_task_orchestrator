@@ -1,106 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/open-rmf/crossflow/refs/heads/main/diagram.schema.json",
   "version": "0.1.0",
-<<<<<<< HEAD
   "templates": {},
   "start": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
   "ops": {
     "de856421-c323-43c2-b7a4-a3d2bf93fc83": {
       "type": "buffer"
-=======
-  "templates": {
-    "new_template": {
-      "inputs": {
-        "new_input": "7e2597ad-42f5-4700-a70a-a257c1fd318e"
-      },
-      "outputs": [
-        "new_output"
-      ],
-      "buffers": {},
-      "ops": {
-        "7e2597ad-42f5-4700-a70a-a257c1fd318e": {
-          "type": "node",
-          "builder": "MqttSubscribeAndWait",
-          "next": "3619c285-ee4c-4c7b-8a9a-894c7c22a554"
-        },
-        "0fd60af7-f840-4838-bf93-6c96d3d59fc1": {
-          "type": "node",
-          "builder": "MqttPublish",
-          "next": {
-            "builtin": "dispose"
-          }
-        },
-        "3619c285-ee4c-4c7b-8a9a-894c7c22a554": {
-          "type": "fork_result",
-          "err": "7e2597ad-42f5-4700-a70a-a257c1fd318e",
-          "ok": "31075fad-b685-4db6-97f9-a4390cf95299"
-        },
-        "31075fad-b685-4db6-97f9-a4390cf95299": {
-          "type": "fork_clone",
-          "next": [
-            "0fd60af7-f840-4838-bf93-6c96d3d59fc1"
-          ]
-        }
-      }
-    },
-    "new_template_1": {
-      "inputs": {},
-      "outputs": [],
-      "buffers": {},
-      "ops": {}
-    },
-    "new_template_2": {
-      "inputs": {},
-      "outputs": [],
-      "buffers": {},
-      "ops": {}
-    }
-  },
-  "start": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
-  "ops": {
-    "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a": {
-      "type": "node",
-      "builder": "MqttSubscribeAndWait",
-      "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
-      "config": {
-        "timeout_secs": 5,
-        "topic": "order/v1",
-        "condition": "message.state=='IDLE'"
-      }
-    },
-    "44950b8b-47c0-4c0d-ad1d-ffba4663e238": {
-      "type": "node",
-      "builder": "CELCondition",
-      "next": "01c47f97-0599-4f3f-a9ba-945648c346c7",
-      "config": {
-        "condition": "has(message.Timeout)"
-      }
-    },
-    "02bda6f3-499e-4808-8bfa-9455a44af70c": {
-      "type": "node",
-      "builder": "MqttPublish",
-      "next": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
-      "config": {
-        "topic": "order/v1",
-        "payload": {
-          "state": "IDLE"
-        }
-      }
-    },
-    "71580dd3-cbb5-41df-8c6e-cb728f2b2f65": {
-      "type": "fork_result",
-      "err": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
-      "ok": {
-        "builtin": "terminate"
-      }
-    },
-    "427452e0-7ef7-4635-ae37-705ac5bbe5c5": {
-      "type": "fork_clone",
-      "next": [
-        "02bda6f3-499e-4808-8bfa-9455a44af70c",
-        "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a"
-      ]
->>>>>>> ea63cf2 (chore: Fix builder node name for test and diagrams)
     },
     "01c47f97-0599-4f3f-a9ba-945648c346c7": {
       "type": "fork_result",
@@ -194,67 +99,8 @@
             }
           },
           {
-<<<<<<< HEAD
             "id": "ccba632e-ed68-475e-8165-fa7c6b1a50b3",
             "type": "buffer",
-=======
-            "id": "bf93ac0e-22b9-41fe-b313-74e4f582e4b0",
-            "type": "node",
-            "position": {
-              "x": 225,
-              "y": 125
-            },
-            "data": {
-              "namespace": "",
-              "opId": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
-              "op": {
-                "type": "node",
-                "builder": "MqttSubscribeAndWait",
-                "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
-                "config": {
-                  "timeout_secs": 5,
-                  "topic": "order/v1",
-                  "condition": "message.state=='IDLE'"
-                }
-              }
-            },
-            "measured": {
-              "width": 200,
-              "height": 50
-            },
-            "selected": false,
-            "dragging": false
-          },
-          {
-            "id": "9280cf0c-55ed-43b0-b372-f66b2b4178b9",
-            "type": "node",
-            "position": {
-              "x": 225,
-              "y": 325
-            },
-            "data": {
-              "namespace": "",
-              "opId": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
-              "op": {
-                "type": "node",
-                "builder": "CELCondition",
-                "next": "01c47f97-0599-4f3f-a9ba-945648c346c7",
-                "config": {
-                  "condition": "has(message.Timeout)"
-                }
-              }
-            },
-            "measured": {
-              "width": 200,
-              "height": 50
-            },
-            "selected": false,
-            "dragging": false
-          },
-          {
-            "id": "d526adf4-021b-44bc-9ddc-2411c09b5682",
-            "type": "node",
->>>>>>> ea63cf2 (chore: Fix builder node name for test and diagrams)
             "position": {
               "x": 350,
               "y": 725

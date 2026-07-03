@@ -38,3 +38,4 @@ dotenvy = "0.15.7"
 # Logging
 tracing = "0.1.43"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+cel-interpreter = "0.10.0"
