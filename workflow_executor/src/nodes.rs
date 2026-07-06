@@ -350,8 +350,16 @@ fn mqtt_sub_loop(
                 .map_err(|e| MqttNodeError::Subscribe(e.to_string()))?;
 
             loop {
-                let Some(data) = rx.recv().await else {
-                    return Err(MqttNodeError::Subscribe("channel closed".into()));
+                let data = match rx.recv().await {
+                    Ok(data) => data,
+                    // Lagged happens when there are way more messages than the channel can store.
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("MqttSubscribe: lagged {n} messages on {topic}");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        return Err(MqttNodeError::Subscribe("channel closed".into()));
+                    }
                 };
                 let msg = serde_json::from_slice(&data)
                     .map_err(|e| MqttNodeError::Parse(e.to_string()))?;
@@ -422,8 +430,15 @@ fn mqtt_listen_node(
                 .map_err(|e| MqttNodeError::Subscribe(e.to_string()))?;
 
             loop {
-                let Some(data) = rx.recv().await else {
-                    return Err(MqttNodeError::Subscribe("channel closed".into()));
+                let data = match rx.recv().await {
+                    Ok(data) => data,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("MqttListen: lagged {n} messages on {topic}");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        return Err(MqttNodeError::Subscribe("channel closed".into()));
+                    }
                 };
                 match serde_json::from_slice(&data) {
                     Ok(msg) => {
@@ -683,22 +698,30 @@ fn register_mqtt_device_req_node(
 
                     // Wait for device to be IDLE before sending request
                     loop {
-                        if let Some(msg) = status_rx.recv().await {
-                            match serde_json::from_slice::<DeviceStatusUpdate>(&msg) {
-                                Ok(update) => {
-                                    if update.state == "IDLE" {
-                                        break;
-                                    }
-                                    tracing::debug!(
-                                        "MqttDeviceReqNode: waiting for {} to be IDLE (state={})",
-                                        config.asset_id, update.state
-                                    );
+                        let msg = match status_rx.recv().await {
+                            Ok(msg) => msg,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                tracing::warn!("MqttDeviceReqNode: status lagged {n} messages");
+                                continue;
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                return Err("Status channel closed".into());
+                            }
+                        };
+                        match serde_json::from_slice::<DeviceStatusUpdate>(&msg) {
+                            Ok(update) => {
+                                if update.state == "IDLE" {
+                                    break;
                                 }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "MqttDeviceReqNode: failed to parse status update: {e}"
-                                    );
-                                }
+                                tracing::debug!(
+                                    "MqttDeviceReqNode: waiting for {} to be IDLE (state={})",
+                                    config.asset_id, update.state
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "MqttDeviceReqNode: failed to parse status update: {e}"
+                                );
                             }
                         }
                     }
@@ -724,27 +747,35 @@ fn register_mqtt_device_req_node(
 
                     // Wait for task completion/failure
                     loop {
-                        if let Some(msg) = response_rx.recv().await {
-                            match serde_json::from_slice::<DeviceTaskResponse>(&msg) {
-                                Ok(update) => {
-                                    tracing::debug!(
-                                        "MqttDeviceReqNode: task response for {}: status={}",
-                                        config.asset_id, update.status
-                                    );
-                                    if update.status == "COMPLETED" {
-                                        break;
-                                    } else if update.status == "FAILED" {
-                                        return Err(format!(
-                                            "MqttDeviceReqNode: failed for {}: {}",
-                                            config.asset_id, update.error
-                                        ));
-                                    }
+                        let msg = match response_rx.recv().await {
+                            Ok(msg) => msg,
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                tracing::warn!("MqttDeviceReqNode: response lagged {n} messages");
+                                continue;
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                                return Err("Response channel closed".into());
+                            }
+                        };
+                        match serde_json::from_slice::<DeviceTaskResponse>(&msg) {
+                            Ok(update) => {
+                                tracing::debug!(
+                                    "MqttDeviceReqNode: task response for {}: status={}",
+                                    config.asset_id, update.status
+                                );
+                                if update.status == "COMPLETED" {
+                                    break;
+                                } else if update.status == "FAILED" {
+                                    return Err(format!(
+                                        "MqttDeviceReqNode: failed for {}: {}",
+                                        config.asset_id, update.error
+                                    ));
                                 }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "MqttDeviceReqNode: failed to parse task response: {e}"
-                                    );
-                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "MqttDeviceReqNode: failed to parse task response: {e}"
+                                );
                             }
                         }
                     }

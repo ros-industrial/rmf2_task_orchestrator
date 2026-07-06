@@ -21,14 +21,14 @@ use dashmap::DashMap;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::broadcast;
 
 pub type MqttMessage = Vec<u8>;
 
 #[derive(Clone, bevy_ecs::resource::Resource)]
 pub struct MqttHandle {
     client: AsyncClient,
-    subscriptions: Arc<DashMap<String, mpsc::Sender<MqttMessage>>>,
+    subscriptions: Arc<DashMap<String, broadcast::Sender<MqttMessage>>>,
 }
 
 impl MqttHandle {
@@ -44,8 +44,12 @@ impl MqttHandle {
         &self,
         topic: &str,
         qos: u8,
-    ) -> Result<mpsc::Receiver<MqttMessage>, Box<dyn std::error::Error>> {
-        let (tx, rx) = mpsc::channel(32);
+    ) -> Result<broadcast::Receiver<MqttMessage>, Box<dyn std::error::Error>> {
+        // Clones the tx channel to pass to node if the topic currently has a rx channel opened
+        if let Some(tx) = self.subscriptions.get(topic) {
+            return Ok(tx.subscribe())
+        }
+        let (tx, rx) = broadcast::channel(16);
         self.client
             .subscribe(topic, Self::parse_qos(qos))
             .await
@@ -78,14 +82,14 @@ pub fn mqtt_setup(
     mqttoptions.set_keep_alive(Duration::from_secs(5));
     tracing::info!("MQTT connecting to {}:{} (client_id={})", mqtt_host, mqtt_port, client_id);
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 64);
-    let subscriptions: Arc<DashMap<String, mpsc::Sender<MqttMessage>>> = Arc::new(DashMap::new());
+    let subscriptions: Arc<DashMap<String, broadcast::Sender<MqttMessage>>> = Arc::new(DashMap::new());
     let subs = subscriptions.clone();
     tokio::spawn(async move {
         loop {
             match eventloop.poll().await {
                 Ok(Event::Incoming(Packet::Publish(publish))) => {
                     if let Some(tx) = subs.get(publish.topic.as_str()) {
-                        let _ = tx.try_send(publish.payload.to_vec());
+                        let _ = tx.send(publish.payload.to_vec());
                     }
                 }
                 Ok(_) => {}
