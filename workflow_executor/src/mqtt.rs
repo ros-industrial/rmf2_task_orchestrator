@@ -89,7 +89,12 @@ pub fn mqtt_setup(
             match eventloop.poll().await {
                 Ok(Event::Incoming(Packet::Publish(publish))) => {
                     if let Some(tx) = subs.get(publish.topic.as_str()) {
-                        let _ = tx.send(publish.payload.to_vec());
+                        // Err here will signal that no more receivers are active, drop the tx and subscription topic
+                        if tx.send(publish.payload.to_vec()).is_err() {
+                            drop(tx);
+                            subs.remove(publish.topic.as_str());
+                            tracing::debug!("MQTT: no receivers on {}, unsubscribed", publish.topic);
+                        }
                     }
                 }
                 Ok(_) => {}
