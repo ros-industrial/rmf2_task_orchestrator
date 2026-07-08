@@ -15,7 +15,7 @@
     },
     "publish": {
       "type": "node",
-      "builder": "MqttPublish",
+      "builder": "mqtt_publish",
       "config": {
         "topic": "asset/Robot1/status",
         "payload": {
@@ -38,7 +38,7 @@
     },
     "check_status": {
       "type": "node",
-      "builder": "CELCondition",
+      "builder": "cel_condition",
       "config": {
         "condition": "status == 'COMPLETED'"
       },
@@ -46,7 +46,7 @@
     },
     "consume": {
       "type": "node",
-      "builder": "ConsumeMessage",
+      "builder": "consume_message",
       "next": "check_status"
     },
     "watch": {
@@ -61,7 +61,7 @@
     },
     "mqtt_listen": {
       "type": "node",
-      "builder": "MqttListen",
+      "builder": "mqtt_listen",
       "config": {
         "topic": "asset/Robot1/status",
         "qos": 0
@@ -164,7 +164,7 @@
               "opId": "publish",
               "op": {
                 "type": "node",
-                "builder": "MqttPublish",
+                "builder": "mqtt_publish",
                 "config": {
                   "topic": "asset/Robot1/status",
                   "payload": {
@@ -220,7 +220,7 @@
               "opId": "check_status",
               "op": {
                 "type": "node",
-                "builder": "CELCondition",
+                "builder": "cel_condition",
                 "config": {
                   "condition": "status == 'COMPLETED'"
                 },
@@ -269,7 +269,7 @@
               "opId": "consume",
               "op": {
                 "type": "node",
-                "builder": "ConsumeMessage",
+                "builder": "consume_message",
                 "next": "consume_result"
               }
             },
@@ -333,7 +333,7 @@
               "opId": "mqtt_listen",
               "op": {
                 "type": "node",
-                "builder": "MqttListen",
+                "builder": "mqtt_listen",
                 "config": {
                   "topic": "asset/Robot1/status",
                   "qos": 0

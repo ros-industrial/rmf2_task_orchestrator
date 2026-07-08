@@ -30,7 +30,7 @@
     },
     "02bda6f3-499e-4808-8bfa-9455a44af70c": {
       "type": "node",
-      "builder": "MqttPublish",
+      "builder": "mqtt_publish",
       "next": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
       "config": {
         "topic": "order/v1",
@@ -41,7 +41,7 @@
     },
     "44950b8b-47c0-4c0d-ad1d-ffba4663e238": {
       "type": "node",
-      "builder": "CELCondition",
+      "builder": "cel_condition",
       "next": "01c47f97-0599-4f3f-a9ba-945648c346c7",
       "config": {
         "condition": "has(message.Timeout)"
@@ -49,7 +49,7 @@
     },
     "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a": {
       "type": "node",
-      "builder": "MqttSubscribeAndWait",
+      "builder": "mqtt_subscribe_and_wait",
       "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
       "config": {
         "timeout_secs": 5,
@@ -198,7 +198,7 @@
               "opId": "02bda6f3-499e-4808-8bfa-9455a44af70c",
               "op": {
                 "type": "node",
-                "builder": "MqttPublish",
+                "builder": "mqtt_publish",
                 "next": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
                 "config": {
                   "topic": "order/v1",
@@ -225,7 +225,7 @@
               "opId": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
               "op": {
                 "type": "node",
-                "builder": "CELCondition",
+                "builder": "cel_condition",
                 "next": "01c47f97-0599-4f3f-a9ba-945648c346c7",
                 "config": {
                   "condition": "has(message.Timeout)"
@@ -249,7 +249,7 @@
               "opId": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
               "op": {
                 "type": "node",
-                "builder": "MqttSubscribeAndWait",
+                "builder": "mqtt_subscribe_and_wait",
                 "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
                 "config": {
                   "timeout_secs": 5,

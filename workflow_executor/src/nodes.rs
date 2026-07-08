@@ -85,7 +85,7 @@ struct CelConditionEvalConfig {
 fn register_cel_eval_condition_node(
     registry: &mut DiagramElementRegistry) {
         registry.register_node_builder(
-            NodeBuilderOptions::new("CELCondition")
+            NodeBuilderOptions::new("cel_condition")
             .with_default_display_text("CEL Condition")
             .with_description("Evaluates a bool condition. If true, returns Ok, else returns Err.
                 Input message will pass through the node")
@@ -189,7 +189,7 @@ struct MqttPublishConfig {
 fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry) {
     registry
         .register_node_builder(
-            NodeBuilderOptions::new("MqttPublish")
+            NodeBuilderOptions::new("mqtt_publish")
                 .with_default_display_text("MQTT Publish")
                 .with_description("Publish a message to a MQTT topic. If no payload specified in config, pull from upstream request")
                 .with_config_examples([
@@ -270,7 +270,7 @@ fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_ser
   Service<((), BufferKey<f32>), ()>) {
       registry
           .register_node_builder(
-              NodeBuilderOptions::new("MqttSubscribeAndWait")
+              NodeBuilderOptions::new("mqtt_subscribe_and_wait")
                   .with_default_display_text("MQTT Subscribe and wait")
                   .with_description("Subscribe to an MQTT topic and wait for a CEL condition with a timeout.")
                   .with_config_examples([
@@ -360,7 +360,7 @@ fn mqtt_subscribe_node(
 }
 
 #[derive(StreamPack)]
-struct MqttStream {
+struct MessageStream {
     pub message: JsonMessage
 }
 
@@ -376,7 +376,7 @@ fn register_mqtt_listen_node(
 ) {
     registry
         .register_node_builder(
-            NodeBuilderOptions::new("MqttListen")
+            NodeBuilderOptions::new("mqtt_listen")
                 .with_default_display_text("MQTT Listen")
                 .with_description("Subscribe to an MQTT topic and stream messages continuously. Connect the stream output into a buffer for downstream consumption via listen/join/buffer_access.")
                 .with_config_examples([
@@ -398,10 +398,10 @@ fn register_mqtt_listen_node(
 fn mqtt_listen_node(
     builder: &mut Builder,
     config: MqttListenConfig,
-) -> Node<JsonMessage, Result<(), MqttNodeError>, MqttStream> {
+) -> Node<JsonMessage, Result<(), MqttNodeError>, MessageStream> {
     let MqttListenConfig { topic, qos } = config;
     let callback = move |
-        Async { streams, .. }: Async<JsonMessage, MqttStream>,
+        Async { streams, .. }: Async<JsonMessage, MessageStream>,
         mqtt_handle: Res<MqttHandle>,
     | {
         let topic = topic.clone();
@@ -457,7 +457,7 @@ fn register_consume_message_node(registry: &mut DiagramElementRegistry) {
         .no_serializing()
         .no_deserializing()
         .register_node_builder(
-            NodeBuilderOptions::new("ConsumeMessage")
+            NodeBuilderOptions::new("consume_message")
                 .with_description("Generic consumer used to consume JSON msgs from buffers"),
             |builder, _config: ()| {
             let n = builder.create_node(consume_message.into_callback());
@@ -902,7 +902,7 @@ mod tests {
             "ops": {
                 "publish": {
                     "type": "node",
-                    "builder": "MqttPublish",
+                    "builder": "mqtt_publish",
                     "config": {
                         "topic": "test/pub",
                         "payload": { "msg": "hello" },
@@ -931,7 +931,7 @@ mod tests {
             "ops": {
                 "subscribe": {
                     "type": "node",
-                    "builder": "MqttSubscribeAndWait",
+                    "builder": "mqtt_subscribe_and_wait",
                     "config": {
                         "topic": "test/sub",
                         "condition": "status == 'OK'",
@@ -960,7 +960,7 @@ mod tests {
             "ops": {
                 "listen": {
                     "type": "node",
-                    "builder": "MqttListen",
+                    "builder": "mqtt_listen",
                     "config": {
                         "topic": "test/listen",
                         "qos": 0
@@ -1002,7 +1002,7 @@ mod tests {
                 },
                 "mqtt_listen": {
                     "type": "node",
-                    "builder": "MqttListen",
+                    "builder": "mqtt_listen",
                     "config": {
                         "topic": "test/listen",
                         "qos": 0
@@ -1024,12 +1024,12 @@ mod tests {
                 },
                 "consume": {
                     "type": "node",
-                    "builder": "ConsumeMessage",
+                    "builder": "consume_message",
                     "next": "cel"
                 },
                 "cel": {
                     "type": "node",
-                    "builder": "CELCondition",
+                    "builder": "cel_condition",
                     "config": {
                         "condition": "value == 42 && sensor == 'temperature'"
                     },
@@ -1042,7 +1042,7 @@ mod tests {
                 },
                 "publish": {
                     "type": "node",
-                    "builder": "MqttPublish",
+                    "builder": "mqtt_publish",
                     "config": {
                         "topic": "test/listen",
                         "payload": { "sensor": "temperature", "value": 42 },
@@ -1091,7 +1091,7 @@ mod tests {
                 },
                 "publish": {
                     "type": "node",
-                    "builder": "MqttPublish",
+                    "builder": "mqtt_publish",
                     "config": {
                         "topic": "test/pub_sub",
                         "payload": { "status": "OK" },
@@ -1107,7 +1107,7 @@ mod tests {
                 },
                 "subscribe": {
                     "type": "node",
-                    "builder": "MqttSubscribeAndWait",
+                    "builder": "mqtt_subscribe_and_wait",
                     "config": {
                         "topic": "test/pub_sub",
                         "condition": "status == 'OK'",
