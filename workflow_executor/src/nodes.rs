@@ -20,7 +20,7 @@ use crate::executor::Clients;
 use crate::mqtt::MqttHandle;
 
 use amqp::AmqpClient;
-use cel::{Context, Program, Value};
+use cel_interpreter::{Context, Program, Value};
 use crossflow::prelude::*;
 use crossflow::ConfigExample;
 use crossflow::bevy_app::{App, Update};
@@ -363,7 +363,7 @@ fn mqtt_subscribe_node(
 struct MessageStream {
     pub message: JsonMessage
 }
-
+ 
 #[derive(Default, Serialize, Deserialize, JsonSchema, Clone)]
 struct MqttListenConfig {
     pub topic: String,
