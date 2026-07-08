@@ -97,21 +97,34 @@ fn register_cel_eval_condition_node(
             })
             ]),
             |builder, config: CelConditionEvalConfig | {
-                let condition = config.condition;
-                builder.create_map_block(move | request: JsonMessage| {
-                    if condition.is_empty() {
-                        return Ok(request);
-                    }
-                    match eval_condition(&condition, &request) {
-                        Ok(true) => Ok(request),
-                        Ok(false) => Err(request),
-                        Err(e) => Err(serde_json::json!({"error": e})),
-                    }
-                })
+                eval_condition_node(builder, config)
             }
         )
         .with_result();
     }
+
+fn eval_condition_node(
+    builder: &mut Builder,
+    config: CelConditionEvalConfig,
+) -> Node<JsonMessage, Result<JsonMessage, JsonMessage>>{
+    let condition = config.condition;
+    builder.create_map_block(move | request: JsonMessage| {
+        if condition.is_empty() {
+            return Ok(request)
+        }
+        match eval_condition(&condition, &request) {
+            Ok(true) => Ok(request),
+            Ok(false) => Err(serde_json::json!({
+                "error": format!("condition '{}' evaluated to false", condition),
+                "message": request
+            })),
+            Err(e) => Err(serde_json::json!({
+                "error": e,
+                "message": request
+            })),
+        }
+    })
+}
 
 /// Evaluates a message with a condition.
 /// For evaluating a JSON obj, eg. {"Err":{"Timeout": {"Code": 404}}}, can be written as Err.Timeout.Code == 404 instead of message.Err.Timeout.Code == 404
@@ -297,21 +310,37 @@ fn mqtt_subscribe_node(
     // Timeout is achieved by racing the mqtt sub loop with the timeout service using a fork clone. If a message
     // is not received during the timeout duration, returns a timeout error.
     builder.create_io_scope(|scope, builder| {
-        let sub_loop = mqtt_sub_loop(builder, topic, condition, qos);
-        let time_buffer: Buffer<f32> = builder.create_buffer(BufferSettings::default());
-        let buffer_access= builder.create_buffer_access(time_buffer);
+        let sub_loop = mqtt_listen_node(builder, MqttListenConfig {topic, qos});
+        let msg_buffer: Buffer<JsonMessage> = builder.create_buffer(BufferSettings::default());
+        let cel_node = eval_condition_node(builder, CelConditionEvalConfig {
+            condition: condition.clone(),
+        });
         builder
-            .chain(sub_loop.output)
-            .connect(scope.terminate);
+            .listen(msg_buffer)
+            .map_block(|key| ConsumeMessageKey {message: key})
+            .then(consume_message.into_callback())
+            .dispose_on_none()
+            .connect(cel_node.input);
 
         builder
-            .chain(buffer_access.output)
+            .chain(cel_node.output)
+            .fork_result(
+            |ok| ok.map_block(|msg| Ok(msg)).connect(scope.terminate),
+            |err| err.unused());
+        builder
+            .chain(sub_loop.streams.message)
+            .connect(msg_buffer.input_slot());
+
+        let time_buffer: Buffer<f32> = builder.create_buffer(BufferSettings::default());
+        let time_buffer_access= builder.create_buffer_access(time_buffer);
+
+        builder
+            .chain(time_buffer_access.output)
             .then(timer_service)
             .map_block(move |_| {
                 Err(MqttNodeError::Timeout { topic: mqtt_topic.clone() })
             })
             .connect(scope.terminate);
-
         builder.chain(scope.start).fork_clone((
             |chain: Chain<_>| {
                 chain.connect(sub_loop.input);
@@ -324,56 +353,10 @@ fn mqtt_subscribe_node(
             |chain: Chain<_>| {
                 chain
                     .trigger()
-                    .connect(buffer_access.input);
+                    .connect(time_buffer_access.input);
             },
         ));
     })   
-}
-
-fn mqtt_sub_loop(
-    builder: &mut Builder,
-    topic: String,
-    condition: String,
-    qos: u8,
-) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
-    let callback = move |
-    Async {..}: Async<JsonMessage>,
-    mqtt_handle: Res<MqttHandle>,
-    | {
-        let topic = topic.clone();
-        let condition = condition.clone();
-        let mqtt_handle = mqtt_handle.clone();
-        async move {
-            let mut rx = mqtt_handle
-                .subscribe(&topic, qos)
-                .await
-                .map_err(|e| MqttNodeError::Subscribe(e.to_string()))?;
-
-            loop {
-                let data = match rx.recv().await {
-                    Ok(data) => data,
-                    // Lagged happens when there are way more messages than the channel can store.
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        tracing::warn!("MqttSubscribe: lagged {n} messages on {topic}");
-                        continue;
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                        return Err(MqttNodeError::Subscribe("channel closed".into()));
-                    }
-                };
-                let msg = serde_json::from_slice(&data)
-                    .map_err(|e| MqttNodeError::Parse(e.to_string()))?;
-                if condition.is_empty() {
-                    return Ok(msg);
-                }
-                if eval_condition(&condition, &msg)
-                    .map_err(MqttNodeError::Condition)? {
-                        return Ok(msg);
-                }
-            }
-        }
-    };
-    builder.create_node(callback.into_callback())
 }
 
 #[derive(StreamPack)]
@@ -463,10 +446,9 @@ struct ConsumeMessageKey
 fn consume_message(
     Blocking {request: keys, id, .. }: Blocking<ConsumeMessageKey>,
     mut message_access: BufferAccess<JsonMessage>,
-) -> Result<JsonMessage,()> {
-    let msg = message_access.get_newest(id, &keys.message)
-        .ok_or(())?;
-    Ok(msg.clone())
+) -> Option<JsonMessage> {
+    let msg = message_access.get_newest(id, &keys.message)?;
+    Some(msg.clone())
 }
 
 fn register_consume_message_node(registry: &mut DiagramElementRegistry) {
@@ -477,10 +459,17 @@ fn register_consume_message_node(registry: &mut DiagramElementRegistry) {
         .register_node_builder(
             NodeBuilderOptions::new("ConsumeMessage")
                 .with_description("Generic consumer used to consume JSON msgs from buffers"),
-            |builder, _config: ()| builder.create_node(consume_message.into_callback()),
+            |builder, _config: ()| {
+            let n = builder.create_node(consume_message.into_callback());
+            let output = builder.chain(n.output).dispose_on_none().output();
+            Node::<ConsumeMessageKey, _> {
+                input: n.input,
+                output,
+                streams: n.streams,
+            }
+            }
         )
-        .with_listen()
-        .with_result();
+        .with_listen();
 }
 
 #[derive(Serialize)]
@@ -898,6 +887,7 @@ mod tests {
         register_mqtt_publish_node(registry);
         register_mqtt_subscribe_node(registry, timer_service);
         register_consume_message_node(registry);
+        register_cel_eval_condition_node(registry);
     }
 
     #[tokio::test]
@@ -1035,12 +1025,20 @@ mod tests {
                 "consume": {
                     "type": "node",
                     "builder": "ConsumeMessage",
-                    "next": "consume_result"
+                    "next": "cel"
                 },
-                "consume_result": {
+                "cel": {
+                    "type": "node",
+                    "builder": "CELCondition",
+                    "config": {
+                        "condition": "value == 42 && sensor == 'temperature'"
+                    },
+                    "next": "cel_result"
+                },
+                "cel_result": {
                     "type": "fork_result",
                     "ok": { "builtin": "terminate" },
-                    "err": { "builtin": "dispose" }
+                    "err": { "builtin": "terminate" }
                 },
                 "publish": {
                     "type": "node",
@@ -1049,7 +1047,7 @@ mod tests {
                         "topic": "test/listen",
                         "payload": { "sensor": "temperature", "value": 42 },
                         "qos": 0,
-                        "retain": true
+                        "retain": false
                     },
                     "next": "pub_result"
                 },
@@ -1073,7 +1071,7 @@ mod tests {
         let finished = ctx.run_with_conditions(&mut outcome, FlushConditions::new().with_timeout(Duration::from_secs(5)));
         assert!(finished, "MqttListen test timed out, msg never arrived in buffer");
         ctx.assert_no_errors();
-        let result: JsonMessage = outcome.try_recv().unwrap().unwrap();
+        let result= outcome.try_recv().unwrap().unwrap();
         assert_eq!(result, json!({"sensor": "temperature", "value": 42}));
     }
 

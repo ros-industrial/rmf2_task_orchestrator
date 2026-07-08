@@ -44,17 +44,10 @@
       },
       "next": "status_result"
     },
-    "consume_result": {
-      "type": "fork_result",
-      "ok": "check_status",
-      "err": {
-        "builtin": "dispose"
-      }
-    },
     "consume": {
       "type": "node",
       "builder": "ConsumeMessage",
-      "next": "consume_result"
+      "next": "check_status"
     },
     "watch": {
       "type": "listen",
