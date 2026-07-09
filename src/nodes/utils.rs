@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use cel::{Context, Program, Value};
+use cel_interpreter::{Context, Program, Value};
 use crossflow::prelude::*;
 use crossflow::ConfigExample;
 use crossflow::bevy_ecs::prelude::Res;
