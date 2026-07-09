@@ -1,0 +1,596 @@
+{
+  "$schema": "https://raw.githubusercontent.com/open-rmf/crossflow/refs/heads/main/diagram.schema.json",
+  "version": "0.1.0",
+  "templates": {},
+  "start": "fork",
+  "ops": {
+    "pub_result": {
+      "type": "fork_result",
+      "ok": {
+        "builtin": "dispose"
+      },
+      "err": {
+        "builtin": "dispose"
+      }
+    },
+    "publish": {
+      "type": "node",
+      "builder": "mqtt_publish",
+      "config": {
+        "topic": "asset/Robot1/status",
+        "payload": {
+          "status": "COMPLETED",
+          "asset_id": "Robot1"
+        },
+        "qos": 0,
+        "retain": false
+      },
+      "next": "pub_result"
+    },
+    "status_result": {
+      "type": "fork_result",
+      "ok": {
+        "builtin": "terminate"
+      },
+      "err": {
+        "builtin": "dispose"
+      }
+    },
+    "check_status": {
+      "type": "node",
+      "builder": "cel_condition",
+      "config": {
+        "condition": "status == 'COMPLETED'"
+      },
+      "next": "status_result"
+    },
+    "consume": {
+      "type": "node",
+      "builder": "consume_message",
+      "next": "check_status"
+    },
+    "watch": {
+      "type": "listen",
+      "buffers": {
+        "message": "msg_buffer"
+      },
+      "next": "consume"
+    },
+    "msg_buffer": {
+      "type": "buffer"
+    },
+    "mqtt_listen": {
+      "type": "node",
+      "builder": "mqtt_listen",
+      "config": {
+        "topic": "asset/Robot1/status",
+        "qos": 0
+      },
+      "next": {
+        "builtin": "dispose"
+      },
+      "stream_out": {
+        "message": "msg_buffer"
+      }
+    },
+    "fork": {
+      "type": "fork_clone",
+      "next": [
+        "mqtt_listen",
+        "publish"
+      ]
+    }
+  },
+  "description": "Showcases the MqttListen + ConsumeMessage pattern.\n\nTwo parallel branches:\n1. MqttListen continuously streams messages from 'asset/Robot1/status' into a buffer. Listen node watches the buffer and triggers ConsumeMessage to read each message. A CEL condition checks if status == 'COMPLETED' and terminates the workflow when matched.\n2. MqttPublish sends a test message with status 'COMPLETED' to the same topic.\n\nDiagram flow: stream_out -> buffer -> listen -> ConsumeMessage -> CELCondition ",
+  "input_examples": [
+    {
+      "name": "Start",
+      "description": "Trigger to start listening and publishing",
+      "value": {}
+    }
+  ],
+  "script_environments": {},
+  "extensions": {
+    "crossflow-diagram-editor-v1": {
+      "hash": "b91b4fa319742e424a467f9452d7d94db8df0b00",
+      "state": {
+        "nodes": [
+          {
+            "id": ":__builtin_start__",
+            "type": "start",
+            "position": {
+              "x": 225,
+              "y": 25
+            },
+            "selectable": false,
+            "data": {
+              "namespace": ""
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": ":__builtin_terminate__",
+            "type": "terminate",
+            "position": {
+              "x": 350,
+              "y": 925
+            },
+            "selectable": false,
+            "data": {
+              "namespace": ""
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "3185b623-451a-4cfa-9f89-c587198e654a",
+            "type": "fork_result",
+            "position": {
+              "x": 100,
+              "y": 325
+            },
+            "data": {
+              "namespace": "",
+              "opId": "pub_result",
+              "op": {
+                "type": "fork_result",
+                "ok": {
+                  "builtin": "dispose"
+                },
+                "err": {
+                  "builtin": "dispose"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "d2e376b8-13b2-4d02-98ee-25f0d70e7684",
+            "type": "node",
+            "position": {
+              "x": 100,
+              "y": 225
+            },
+            "data": {
+              "namespace": "",
+              "opId": "publish",
+              "op": {
+                "type": "node",
+                "builder": "mqtt_publish",
+                "config": {
+                  "topic": "asset/Robot1/status",
+                  "payload": {
+                    "status": "COMPLETED",
+                    "asset_id": "Robot1"
+                  },
+                  "qos": 0,
+                  "retain": false
+                },
+                "next": "pub_result"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false
+          },
+          {
+            "id": "8f11e507-afa8-4d68-bf45-d79a72965e7e",
+            "type": "fork_result",
+            "position": {
+              "x": 350,
+              "y": 825
+            },
+            "data": {
+              "namespace": "",
+              "opId": "status_result",
+              "op": {
+                "type": "fork_result",
+                "ok": {
+                  "builtin": "terminate"
+                },
+                "err": {
+                  "builtin": "dispose"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "a23d9ebd-a11d-455b-b7d2-a6357e6671c6",
+            "type": "node",
+            "position": {
+              "x": 350,
+              "y": 725
+            },
+            "data": {
+              "namespace": "",
+              "opId": "check_status",
+              "op": {
+                "type": "node",
+                "builder": "cel_condition",
+                "config": {
+                  "condition": "status == 'COMPLETED'"
+                },
+                "next": "status_result"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false
+          },
+          {
+            "id": "33f30ea8-1336-4cef-889f-d4bb25258bc4",
+            "type": "fork_result",
+            "position": {
+              "x": 350,
+              "y": 625
+            },
+            "data": {
+              "namespace": "",
+              "opId": "consume_result",
+              "op": {
+                "type": "fork_result",
+                "ok": "check_status",
+                "err": {
+                  "builtin": "dispose"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false
+          },
+          {
+            "id": "f35392e6-0b93-4dc7-9277-2a2cb4c21efb",
+            "type": "node",
+            "position": {
+              "x": 350,
+              "y": 525
+            },
+            "data": {
+              "namespace": "",
+              "opId": "consume",
+              "op": {
+                "type": "node",
+                "builder": "consume_message",
+                "next": "consume_result"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            },
+            "selected": false
+          },
+          {
+            "id": "0fe18e10-a6fc-4e0c-b76d-4ffdf8d9d5fb",
+            "type": "listen",
+            "position": {
+              "x": 350,
+              "y": 425
+            },
+            "data": {
+              "namespace": "",
+              "opId": "watch",
+              "op": {
+                "type": "listen",
+                "buffers": {
+                  "message": "msg_buffer"
+                },
+                "next": "consume"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "4045e6b2-f99c-4c43-923a-0c6d69493213",
+            "type": "buffer",
+            "position": {
+              "x": 350,
+              "y": 325
+            },
+            "data": {
+              "namespace": "",
+              "opId": "msg_buffer",
+              "op": {
+                "type": "buffer"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "71aab825-5f83-4137-8d07-49c58401f42a",
+            "type": "node",
+            "position": {
+              "x": 350,
+              "y": 225
+            },
+            "data": {
+              "namespace": "",
+              "opId": "mqtt_listen",
+              "op": {
+                "type": "node",
+                "builder": "mqtt_listen",
+                "config": {
+                  "topic": "asset/Robot1/status",
+                  "qos": 0
+                },
+                "next": {
+                  "builtin": "dispose"
+                },
+                "stream_out": {
+                  "message": "msg_buffer"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "635942f6-c0f4-48f9-b46c-1b9b3518ba53",
+            "type": "fork_clone",
+            "position": {
+              "x": 225,
+              "y": 125
+            },
+            "data": {
+              "namespace": "",
+              "opId": "fork",
+              "op": {
+                "type": "fork_clone",
+                "next": [
+                  "mqtt_listen",
+                  "publish"
+                ]
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a3638a04-70e3-4d1f-b231-98067c754db8",
+            "source": ":__builtin_start__",
+            "sourceHandle": null,
+            "target": "635942f6-c0f4-48f9-b46c-1b9b3518ba53",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "fcac86a7-6c69-42a3-88d0-ae233088b14e",
+            "source": "d2e376b8-13b2-4d02-98ee-25f0d70e7684",
+            "sourceHandle": null,
+            "target": "3185b623-451a-4cfa-9f89-c587198e654a",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "678e11fa-c318-404c-9b2d-0b562e3d8e97",
+            "source": "8f11e507-afa8-4d68-bf45-d79a72965e7e",
+            "sourceHandle": "forkResultOk",
+            "target": ":__builtin_terminate__",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultOk",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "55a93b46-cf57-4fa2-b77f-4eae97571626",
+            "source": "a23d9ebd-a11d-455b-b7d2-a6357e6671c6",
+            "sourceHandle": null,
+            "target": "8f11e507-afa8-4d68-bf45-d79a72965e7e",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "eef25877-e4c3-4388-9486-51cf63307f36",
+            "source": "33f30ea8-1336-4cef-889f-d4bb25258bc4",
+            "sourceHandle": "forkResultOk",
+            "target": "a23d9ebd-a11d-455b-b7d2-a6357e6671c6",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultOk",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "b7a5d23f-6acb-40f4-b7f9-aa7f06d52fcf",
+            "source": "f35392e6-0b93-4dc7-9277-2a2cb4c21efb",
+            "sourceHandle": null,
+            "target": "33f30ea8-1336-4cef-889f-d4bb25258bc4",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "2be3135e-4a11-43ec-8269-39fd77c4d609",
+            "source": "4045e6b2-f99c-4c43-923a-0c6d69493213",
+            "sourceHandle": null,
+            "target": "0fe18e10-a6fc-4e0c-b76d-4ffdf8d9d5fb",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "buffer",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "bufferKey",
+                "key": "message"
+              }
+            },
+            "style": {}
+          },
+          {
+            "id": "aaeb6623-9690-4474-9c5b-99c15046c23a",
+            "source": "0fe18e10-a6fc-4e0c-b76d-4ffdf8d9d5fb",
+            "sourceHandle": null,
+            "target": "f35392e6-0b93-4dc7-9277-2a2cb4c21efb",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "713b8639-a0a0-4db5-aaf5-359a4561346d",
+            "source": "71aab825-5f83-4137-8d07-49c58401f42a",
+            "sourceHandle": "dataStream",
+            "target": "4045e6b2-f99c-4c43-923a-0c6d69493213",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "streamOut",
+            "data": {
+              "output": {
+                "streamId": "message"
+              },
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "9aea0ed6-bd61-4545-b29e-bdc821db5da4",
+            "source": "635942f6-c0f4-48f9-b46c-1b9b3518ba53",
+            "sourceHandle": null,
+            "target": "71aab825-5f83-4137-8d07-49c58401f42a",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "3bdcb327-a312-4cb6-9165-f37210b2cd1b",
+            "source": "635942f6-c0f4-48f9-b46c-1b9b3518ba53",
+            "sourceHandle": null,
+            "target": "d2e376b8-13b2-4d02-98ee-25f0d70e7684",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
