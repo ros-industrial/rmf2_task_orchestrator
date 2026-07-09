@@ -17,7 +17,7 @@
  */
 
 use crate::client::mqtt::MqttHandle;
-use crate::node::{CelConditionEvalConfig, ConsumeMessageKey, MessageStream, consume_message, eval_condition_node};
+use crate::node::utils::{CelConditionEvalConfig, ConsumeMessageKey, MessageStream, consume_message, eval_condition_node};
 
 use crossflow::prelude::*;
 use crossflow::ConfigExample;
@@ -59,7 +59,20 @@ struct MqttPublishConfig {
     pub retain: bool,
 }
 
-pub(crate) fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry) {
+pub(crate) fn register(
+    app: &mut crossflow::bevy_app::App,
+    registry: &mut DiagramElementRegistry,
+    mqtt_handle: Arc<MqttHandle>,
+) {
+    app.insert_resource(mqtt_handle.as_ref().clone());
+    let timer_service = app.spawn_continuous_service(crossflow::bevy_app::Update, crate::node::utils::timer_countdown);
+    register_mqtt_publish_node(registry);
+    register_mqtt_subscribe_node(registry, timer_service);
+    register_mqtt_listen_node(registry);
+    register_mqtt_device_req_node(registry, mqtt_handle);
+}
+
+fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry) {
     registry
         .register_node_builder(
             NodeBuilderOptions::new("mqtt_publish")
@@ -134,7 +147,7 @@ fn default_qos() -> u8 {
     0
 }
 
-pub(crate) fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_service:
+fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_service:
   Service<((), BufferKey<f32>), ()>) {
       registry
           .register_node_builder(
@@ -234,7 +247,7 @@ struct MqttListenConfig {
     pub qos: u8,
 }
 
-pub(crate) fn register_mqtt_listen_node(
+fn register_mqtt_listen_node(
     registry: &mut DiagramElementRegistry
 ) {
     registry
@@ -324,7 +337,7 @@ struct DeviceTaskResponse {
     error: String,
 }
 
-pub(crate) fn register_mqtt_device_req_node(
+fn register_mqtt_device_req_node(
     registry: &mut DiagramElementRegistry,
     mqtt_client: Arc<MqttHandle>,
 ) {
@@ -450,10 +463,10 @@ pub(crate) fn register_mqtt_device_req_node(
 #[cfg(test)]
 mod tests {
     use crossflow::{Diagram, DiagramElementRegistry, testing::*};
-    use crossflow::bevy_app::{App, Update};
+    use crossflow::bevy_app::App;
     use crate::client::mqtt::mqtt_setup;
-    use crate::node::{timer_countdown, register_consume_message_node, register_cel_eval_condition_node};
     use serde_json::json;
+    use std::sync::Arc;
     use std::time::Duration;
     use super::*;
 
@@ -461,13 +474,8 @@ mod tests {
         let mqtt_handle = mqtt_setup("test-client", "localhost", 1883).expect(
             "Mosquitto must be running for MQTT setup"
         );
-        app.insert_resource(mqtt_handle.clone());
-        let timer_service = app.spawn_continuous_service(Update, timer_countdown);
-        register_mqtt_listen_node(registry);
-        register_mqtt_publish_node(registry);
-        register_mqtt_subscribe_node(registry, timer_service);
-        register_consume_message_node(registry);
-        register_cel_eval_condition_node(registry);
+        crate::node::mqtt::register(app, registry, Arc::new(mqtt_handle));
+        crate::node::utils::register(registry);
     }
 
     #[tokio::test]

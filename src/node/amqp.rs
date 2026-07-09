@@ -31,7 +31,13 @@ struct DefaultNodeConfig {
     pub task_id: String,
 }
 
-pub(crate) fn register_default_node(
+pub(crate) fn register(registry: &mut DiagramElementRegistry, amqp_client: Arc<AmqpClient>) {
+    register_default_node(registry);
+    register_goto_node(registry, amqp_client.clone());
+    register_delay_node(registry, amqp_client);
+}
+
+fn register_default_node(
     registry: &mut DiagramElementRegistry,
 ) {
     registry.register_node_builder(
@@ -68,7 +74,7 @@ fn default_delay_duration() -> u64 {
     14
 }
 
-pub(crate) fn register_delay_node(registry: &mut DiagramElementRegistry, amqp_client: Arc<AmqpClient>) {
+fn register_delay_node(registry: &mut DiagramElementRegistry, amqp_client: Arc<AmqpClient>) {
     registry.register_node_builder(
         NodeBuilderOptions::new("DelayNode").with_default_display_text("Delay"),
         move |builder, config: DelayNodeConfig| {
@@ -168,7 +174,7 @@ struct AmqpTaskConfig {
 }
 
 // GoTo Node - publishes a GoTo task request via AMQP and waits for TaskStatus response
-pub(crate) fn register_goto_node(
+fn register_goto_node(
     registry: &mut DiagramElementRegistry,
     amqp_client: Arc<AmqpClient>,
 ) {

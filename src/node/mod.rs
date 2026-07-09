@@ -16,35 +16,6 @@
  * limitations under the License.
  */
 
-mod amqp;
-mod mqtt;
-mod utils;
-
-pub(crate) use utils::*;
-
-use crate::executor::Clients;
-use crossflow::prelude::*;
-use crossflow::bevy_app::{App, Update};
-
-pub fn register_all(
-    app: &mut App,
-    registry: &mut DiagramElementRegistry,
-    clients: &Clients,
-) {
-    let timer_service = app.spawn_continuous_service(Update, utils::timer_countdown);
-    if let Some(amqp_client) = &clients.amqp {
-        amqp::register_default_node(registry);
-        amqp::register_goto_node(registry, amqp_client.clone());
-        amqp::register_delay_node(registry, amqp_client.clone());
-    }
-
-    if let Some(mqtt_handle) = &clients.mqtt {
-        app.insert_resource(mqtt_handle.as_ref().clone());
-        mqtt::register_mqtt_device_req_node(registry, mqtt_handle.clone());
-        mqtt::register_mqtt_subscribe_node(registry, timer_service);
-        mqtt::register_mqtt_publish_node(registry);
-        mqtt::register_mqtt_listen_node(registry);
-    }
-    utils::register_cel_eval_condition_node(registry);
-    utils::register_consume_message_node(registry);
-}
+pub(crate) mod amqp;
+pub(crate) mod mqtt;
+pub(crate) mod utils;

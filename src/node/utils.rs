@@ -30,7 +30,12 @@ pub struct CelConditionEvalConfig {
     pub condition: String,
 }
 
-pub(crate) fn register_cel_eval_condition_node(
+pub(crate) fn register(registry: &mut DiagramElementRegistry) {
+    register_cel_eval_condition_node(registry);
+    register_consume_message_node(registry);
+}
+
+fn register_cel_eval_condition_node(
     registry: &mut DiagramElementRegistry) {
         registry.register_node_builder(
             NodeBuilderOptions::new("cel_condition")
@@ -142,7 +147,7 @@ pub(crate) fn consume_message(
     Some(msg.clone())
 }
 
-pub(crate) fn register_consume_message_node(registry: &mut DiagramElementRegistry) {
+fn register_consume_message_node(registry: &mut DiagramElementRegistry) {
     registry
         .opt_out()
         .no_serializing()

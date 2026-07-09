@@ -128,7 +128,13 @@ pub async fn spawn(clients: Clients, executor_url: String) -> Result<(ExecutorHa
         app.add_plugins((CrossflowExecutorApp::default(), TimePlugin::default()));
 
         let mut registry = DiagramElementRegistry::new();
-        node::register_all(&mut app, &mut registry, &clients);
+        if let Some(amqp_client) = &clients.amqp {
+            node::amqp::register(&mut registry, amqp_client.clone());
+        }
+        if let Some(mqtt_handle) = &clients.mqtt {
+            node::mqtt::register(&mut app, &mut registry, mqtt_handle.clone());
+        }
+        node::utils::register(&mut registry);
 
         let diagram_editor_router = new_router(&mut app, registry, ServerOptions::default());
         let _ = router_tx.send(diagram_editor_router);
