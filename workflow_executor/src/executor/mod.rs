@@ -28,6 +28,7 @@ use amqp_handlers::handle_workflow_execute;
 use amqp::{AmqpClient, AmqpRouter};
 use axum::Router;
 use crossflow::{CrossflowExecutorApp, DiagramElementRegistry, bevy_app};
+use crossflow::bevy_time::TimePlugin;
 use crossflow_diagram_editor::{ServerOptions, new_router};
 use std::sync::Arc;
 use std::thread;
@@ -121,10 +122,10 @@ pub async fn spawn(clients: Clients, executor_url: String) -> Result<(ExecutorHa
 
     thread::spawn(move || {
         let mut app = bevy_app::App::new();
-        app.add_plugins(CrossflowExecutorApp::default());
+        app.add_plugins((CrossflowExecutorApp::default(), TimePlugin::default()));
 
         let mut registry = DiagramElementRegistry::new();
-        nodes::register_all(&mut registry, &clients);
+        nodes::register_all(&mut app, &mut registry, &clients);
 
         let diagram_editor_router = new_router(&mut app, registry, ServerOptions::default());
         let _ = router_tx.send(diagram_editor_router);

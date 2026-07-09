@@ -14,6 +14,9 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
 reqwest = { workspace = true }
+futures = "0.3"
 futures-timer = "3.0"
 dashmap = "6.1.0"
 rumqttc = { workspace = true }
+cel-interpreter = "0.9.1"
+thiserror = "2.0.18"

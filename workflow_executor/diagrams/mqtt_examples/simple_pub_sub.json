@@ -1,0 +1,462 @@
+{
+  "$schema": "https://raw.githubusercontent.com/open-rmf/crossflow/refs/heads/main/diagram.schema.json",
+  "version": "0.1.0",
+  "templates": {},
+  "start": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
+  "ops": {
+    "de856421-c323-43c2-b7a4-a3d2bf93fc83": {
+      "type": "buffer"
+    },
+    "01c47f97-0599-4f3f-a9ba-945648c346c7": {
+      "type": "fork_result",
+      "err": {
+        "builtin": "terminate"
+      },
+      "ok": "427452e0-7ef7-4635-ae37-705ac5bbe5c5"
+    },
+    "427452e0-7ef7-4635-ae37-705ac5bbe5c5": {
+      "type": "fork_clone",
+      "next": [
+        "02bda6f3-499e-4808-8bfa-9455a44af70c",
+        "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a"
+      ]
+    },
+    "71580dd3-cbb5-41df-8c6e-cb728f2b2f65": {
+      "type": "fork_result",
+      "err": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
+      "ok": {
+        "builtin": "terminate"
+      }
+    },
+    "02bda6f3-499e-4808-8bfa-9455a44af70c": {
+      "type": "node",
+      "builder": "mqtt_publish",
+      "next": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
+      "config": {
+        "topic": "order/v1",
+        "payload": {
+          "state": "IDLE"
+        }
+      }
+    },
+    "44950b8b-47c0-4c0d-ad1d-ffba4663e238": {
+      "type": "node",
+      "builder": "cel_condition",
+      "next": "01c47f97-0599-4f3f-a9ba-945648c346c7",
+      "config": {
+        "condition": "has(message.Timeout)"
+      }
+    },
+    "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a": {
+      "type": "node",
+      "builder": "mqtt_subscribe_and_wait",
+      "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
+      "config": {
+        "timeout_secs": 5,
+        "topic": "order/v1",
+        "condition": "message.state=='IDLE'"
+      }
+    }
+  },
+  "description": "Simple diagram showcasing the mqtt pub/sub nodes w/ a CEL condition node.\n \n1. Sub node subscribes to the \"order/v1\" topic with a timeout of 5s and waits for a state == IDLE condition.\n2. If Ok, terminates the workflow else, goes through the Err branch.\n3. If Err output is Timeout, retry the subscriber node and publish \"state\":\"IDLE\" to \"order/v1\".\n\nThe workflow will timeout once -> go through the error branch and retry -> go through the Ok branch -> Terminate workflow  ",
+  "input_examples": [],
+  "script_environments": {},
+  "extensions": {
+    "crossflow-diagram-editor-v1": {
+      "hash": "e316af08f8366c97f0728698d25fd6d8b28709e1",
+      "state": {
+        "nodes": [
+          {
+            "id": ":__builtin_start__",
+            "type": "start",
+            "position": {
+              "x": 225,
+              "y": 25
+            },
+            "selectable": false,
+            "data": {
+              "namespace": ""
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": ":__builtin_terminate__",
+            "type": "terminate",
+            "position": {
+              "x": 100,
+              "y": 525
+            },
+            "selectable": false,
+            "data": {
+              "namespace": ""
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "ccba632e-ed68-475e-8165-fa7c6b1a50b3",
+            "type": "buffer",
+            "position": {
+              "x": 350,
+              "y": 725
+            },
+            "data": {
+              "namespace": "",
+              "opId": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
+              "op": {
+                "type": "buffer"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "e7e29ed8-20d1-41bf-ba0f-1cbd3583bfae",
+            "type": "fork_result",
+            "position": {
+              "x": 225,
+              "y": 425
+            },
+            "data": {
+              "namespace": "",
+              "opId": "01c47f97-0599-4f3f-a9ba-945648c346c7",
+              "op": {
+                "type": "fork_result",
+                "err": {
+                  "builtin": "terminate"
+                },
+                "ok": "427452e0-7ef7-4635-ae37-705ac5bbe5c5"
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "c65abb79-25d3-4c68-a271-01cd80e853c4",
+            "type": "fork_clone",
+            "position": {
+              "x": 350,
+              "y": 525
+            },
+            "data": {
+              "namespace": "",
+              "opId": "427452e0-7ef7-4635-ae37-705ac5bbe5c5",
+              "op": {
+                "type": "fork_clone",
+                "next": [
+                  "02bda6f3-499e-4808-8bfa-9455a44af70c",
+                  "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a"
+                ]
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "4b5f8f37-6f92-4124-b28a-6f50d88d18e3",
+            "type": "fork_result",
+            "position": {
+              "x": 157.5,
+              "y": 225
+            },
+            "data": {
+              "namespace": "",
+              "opId": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
+              "op": {
+                "type": "fork_result",
+                "err": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
+                "ok": {
+                  "builtin": "terminate"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "0bcec6e7-b8c9-493d-8100-16cf933582cc",
+            "type": "node",
+            "position": {
+              "x": 350,
+              "y": 625
+            },
+            "data": {
+              "namespace": "",
+              "opId": "02bda6f3-499e-4808-8bfa-9455a44af70c",
+              "op": {
+                "type": "node",
+                "builder": "mqtt_publish",
+                "next": "de856421-c323-43c2-b7a4-a3d2bf93fc83",
+                "config": {
+                  "topic": "order/v1",
+                  "payload": {
+                    "state": "IDLE"
+                  }
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "19e51267-5bb8-4ef2-bedc-054b8c9aef8e",
+            "type": "node",
+            "position": {
+              "x": 225,
+              "y": 325
+            },
+            "data": {
+              "namespace": "",
+              "opId": "44950b8b-47c0-4c0d-ad1d-ffba4663e238",
+              "op": {
+                "type": "node",
+                "builder": "cel_condition",
+                "next": "01c47f97-0599-4f3f-a9ba-945648c346c7",
+                "config": {
+                  "condition": "has(message.Timeout)"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          },
+          {
+            "id": "ae09a0f1-4e84-4135-9051-da180ae434ce",
+            "type": "node",
+            "position": {
+              "x": 225,
+              "y": 125
+            },
+            "data": {
+              "namespace": "",
+              "opId": "b5ce0956-f0b5-4d84-b4d4-0940e9e7bb4a",
+              "op": {
+                "type": "node",
+                "builder": "mqtt_subscribe_and_wait",
+                "next": "71580dd3-cbb5-41df-8c6e-cb728f2b2f65",
+                "config": {
+                  "timeout_secs": 5,
+                  "topic": "order/v1",
+                  "condition": "message.state=='IDLE'"
+                }
+              }
+            },
+            "measured": {
+              "width": 200,
+              "height": 50
+            }
+          }
+        ],
+        "edges": [
+          {
+            "id": "a30317e4-9bb8-4a25-9fba-1084cb87fa78",
+            "source": ":__builtin_start__",
+            "sourceHandle": null,
+            "target": "ae09a0f1-4e84-4135-9051-da180ae434ce",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "02903100-3e4c-47ec-bfa4-95188f79138a",
+            "source": "e7e29ed8-20d1-41bf-ba0f-1cbd3583bfae",
+            "sourceHandle": "forkResultOk",
+            "target": "c65abb79-25d3-4c68-a271-01cd80e853c4",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultOk",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "fb484423-295f-4620-9b66-322e5eb3bbd2",
+            "source": "e7e29ed8-20d1-41bf-ba0f-1cbd3583bfae",
+            "sourceHandle": "forkResultErr",
+            "target": ":__builtin_terminate__",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultErr",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "550ec608-4ed7-4a65-a048-c0bb63f147d6",
+            "source": "c65abb79-25d3-4c68-a271-01cd80e853c4",
+            "sourceHandle": null,
+            "target": "0bcec6e7-b8c9-493d-8100-16cf933582cc",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "3ddfd18c-5685-4cc0-b98e-f99cff8b9569",
+            "source": "c65abb79-25d3-4c68-a271-01cd80e853c4",
+            "sourceHandle": null,
+            "target": "ae09a0f1-4e84-4135-9051-da180ae434ce",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "bb7e1344-19aa-47d5-a0e1-63503a5f0477",
+            "source": "4b5f8f37-6f92-4124-b28a-6f50d88d18e3",
+            "sourceHandle": "forkResultOk",
+            "target": ":__builtin_terminate__",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultOk",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "d8543d38-24c4-4009-8de8-beab212d8df4",
+            "source": "4b5f8f37-6f92-4124-b28a-6f50d88d18e3",
+            "sourceHandle": "forkResultErr",
+            "target": "19e51267-5bb8-4ef2-bedc-054b8c9aef8e",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "forkResultErr",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "29e56163-0216-492b-842a-39cdf3be0df9",
+            "source": "0bcec6e7-b8c9-493d-8100-16cf933582cc",
+            "sourceHandle": null,
+            "target": "ccba632e-ed68-475e-8165-fa7c6b1a50b3",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "dc3f7906-fc2c-48d3-a1e5-93ec6b101e8c",
+            "source": "19e51267-5bb8-4ef2-bedc-054b8c9aef8e",
+            "sourceHandle": null,
+            "target": "e7e29ed8-20d1-41bf-ba0f-1cbd3583bfae",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          },
+          {
+            "id": "1fdae1a7-1b22-4ce7-98c3-4eb29f261b96",
+            "source": "ae09a0f1-4e84-4135-9051-da180ae434ce",
+            "sourceHandle": null,
+            "target": "4b5f8f37-6f92-4124-b28a-6f50d88d18e3",
+            "targetHandle": null,
+            "markerEnd": {
+              "type": "arrowclosed",
+              "width": 20,
+              "height": 20
+            },
+            "type": "default",
+            "data": {
+              "output": {},
+              "input": {
+                "type": "default"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
