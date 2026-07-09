@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use crate::clients::amqp::AmqpClient;
+use crate::client::amqp::AmqpClient;
 
 use crossflow::prelude::*;
 use futures_timer::Delay;

@@ -18,9 +18,9 @@
 
 mod amqp_handlers;
 
-use crate::clients::amqp::{AmqpClient, AmqpRouter};
-use crate::clients::mqtt::{MqttHandle, mqtt_setup};
-use crate::nodes;
+use crate::client::amqp::{AmqpClient, AmqpRouter};
+use crate::client::mqtt::{MqttHandle, mqtt_setup};
+use crate::node;
 use amqp_handlers::handle_workflow_execute;
 
 use axum::Router;
@@ -128,7 +128,7 @@ pub async fn spawn(clients: Clients, executor_url: String) -> Result<(ExecutorHa
         app.add_plugins((CrossflowExecutorApp::default(), TimePlugin::default()));
 
         let mut registry = DiagramElementRegistry::new();
-        nodes::register_all(&mut app, &mut registry, &clients);
+        node::register_all(&mut app, &mut registry, &clients);
 
         let diagram_editor_router = new_router(&mut app, registry, ServerOptions::default());
         let _ = router_tx.send(diagram_editor_router);

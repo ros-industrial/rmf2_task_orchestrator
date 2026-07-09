@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use crate::clients::amqp::AmqpError;
+use crate::client::amqp::AmqpError;
 use crate::executor::ExecutorHandle;
 use serde::Deserialize;
 

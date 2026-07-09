@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
-use crate::clients::mqtt::MqttHandle;
-use crate::nodes::{CelConditionEvalConfig, ConsumeMessageKey, MessageStream, consume_message, eval_condition_node};
+use crate::client::mqtt::MqttHandle;
+use crate::node::{CelConditionEvalConfig, ConsumeMessageKey, MessageStream, consume_message, eval_condition_node};
 
 use crossflow::prelude::*;
 use crossflow::ConfigExample;
@@ -451,8 +451,8 @@ pub(crate) fn register_mqtt_device_req_node(
 mod tests {
     use crossflow::{Diagram, DiagramElementRegistry, testing::*};
     use crossflow::bevy_app::{App, Update};
-    use crate::clients::mqtt::mqtt_setup;
-    use crate::nodes::{timer_countdown, register_consume_message_node, register_cel_eval_condition_node};
+    use crate::client::mqtt::mqtt_setup;
+    use crate::node::{timer_countdown, register_consume_message_node, register_cel_eval_condition_node};
     use serde_json::json;
     use std::time::Duration;
     use super::*;

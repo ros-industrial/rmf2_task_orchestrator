@@ -4,38 +4,22 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# Crossflow
+axum = "0.8.6"
+cel-interpreter = "0.10.0"
+config = "0.15.19"
 crossflow = { git = "https://github.com/open-rmf/crossflow.git", branch = "main", features = ["diagram"] }
 crossflow_diagram_editor = { git = "https://github.com/open-rmf/crossflow.git", branch = "main", features = ["frontend", "router"] }
-
-# Web
-axum = "0.8.6"
-reqwest = { version = "0.12.24", features = ["json"] }
-
-# Async
-tokio = { version = "1.48.0", features = ["full"] }
+dashmap = "6.1.0"
+dotenvy = "0.15.7"
 futures-lite = "2.6"
 futures-timer = "3.0"
-
-# Serialization
+lapin = "3.7.2"
+reqwest = { version = "0.12.24", features = ["json"] }
+rumqttc = "0.25.1"
+schemars = "1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
-schemars = "1"
-
-# Messaging
-lapin = "3.7.2"
-rumqttc = "0.25.1"
-
-# Utilities
-cel = "0.13.0"
-dashmap = "6.1.0"
 thiserror = "2.0"
-
-# Config
-config = "0.15.19"
-dotenvy = "0.15.7"
-
-# Logging
+tokio = { version = "1.48.0", features = ["full"] }
 tracing = "0.1.43"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-cel-interpreter = "0.10.0"

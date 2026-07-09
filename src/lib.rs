@@ -18,7 +18,7 @@
 
 pub mod config;
 pub mod executor;
-pub mod clients;
-mod nodes;
+pub mod client;
+mod node;
 
 pub use executor::*;

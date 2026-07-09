@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use rmf2_task_orchestrator::clients::amqp::{AmqpConnection, run_consumer};
+use rmf2_task_orchestrator::client::amqp::{AmqpConnection, run_consumer};
 use rmf2_task_orchestrator::config::load_base_configuration;
 use rmf2_task_orchestrator::{ClientsBuilder, create_amqp_router, spawn};
 use axum::{http::StatusCode, routing::get};
