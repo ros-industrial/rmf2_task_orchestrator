@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-use rmf2_task_orchestrator::client::amqp::{AmqpConnection, run_consumer};
+use rmf2_task_orchestrator::client::{AmqpConnection, run_consumer};
 use rmf2_task_orchestrator::config::load_base_configuration;
-use rmf2_task_orchestrator::{ClientsBuilder, create_amqp_router, spawn};
+use rmf2_task_orchestrator::{Clients, create_amqp_router, spawn};
 use axum::{http::StatusCode, routing::get};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -42,13 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let amqp_config = &config.task_orchestrator.amqp;
     let mqtt_config = &config.task_orchestrator.mqtt;
 
-    let clients = ClientsBuilder::new()
-        .amqp(amqp_config.to_url())
-        .amqp_response("@RECEIVE@", "@RECEIVE@-task-responses")
-        .mqtt(&mqtt_config.host, mqtt_config.port)
-        .mqtt_client_id("TaskOrchestrator-MQTT")
-        .build()
-        .await?;
+    let clients = Clients::connect(amqp_config, mqtt_config).await?;
 
     let http_config = &config.task_orchestrator.http;
     let executor_url = format!("http://{}:{}", http_config.host, http_config.port);

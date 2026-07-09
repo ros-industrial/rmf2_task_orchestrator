@@ -18,8 +18,8 @@
 
 mod amqp_handlers;
 
-use crate::client::amqp::{AmqpClient, AmqpRouter};
-use crate::client::mqtt::{MqttHandle, mqtt_setup};
+use crate::client::Clients;
+use crate::client::amqp::AmqpRouter;
 use crate::node;
 use amqp_handlers::handle_workflow_execute;
 
@@ -27,96 +27,12 @@ use axum::Router;
 use crossflow::{CrossflowExecutorApp, DiagramElementRegistry, bevy_app};
 use crossflow::bevy_time::TimePlugin;
 use crossflow_diagram_editor::{ServerOptions, new_router};
-use std::sync::Arc;
 use std::thread;
 use tokio::sync::oneshot;
 
 #[derive(Clone)]
 pub struct ExecutorHandle {
-    // Base URL of the executor HTTP server (e.g. "http://127.0.0.1:2727")
     pub executor_url: String,
-}
-
-// All client handles needed by the executor
-#[derive(Clone)]
-pub struct Clients {
-    pub amqp: Option<Arc<AmqpClient>>,
-    pub mqtt: Option<Arc<MqttHandle>>,
-}
-
-// Builder for creating all clients from config
-pub struct ClientsBuilder {
-    amqp_uri: Option<String>,
-    amqp_response_exchange: String,
-    amqp_response_queue: String,
-    mqtt_host: Option<String>,
-    mqtt_port: Option<u16>,
-    mqtt_client_id: String,
-}
-
-impl ClientsBuilder {
-    pub fn new() -> Self {
-        Self {
-            amqp_uri: None,
-            amqp_response_exchange: "@RECEIVE@".into(),
-            amqp_response_queue: "@RECEIVE@-task-responses".into(),
-            mqtt_host: None,
-            mqtt_port: None,
-            mqtt_client_id: "crossflow".into(),
-        }
-    }
-
-    pub fn amqp(mut self, uri: impl Into<String>) -> Self {
-        self.amqp_uri = Some(uri.into());
-        self
-    }
-
-    pub fn amqp_response(mut self, exchange: impl Into<String>, queue: impl Into<String>) -> Self {
-        self.amqp_response_exchange = exchange.into();
-        self.amqp_response_queue = queue.into();
-        self
-    }
-
-    pub fn mqtt(mut self, host: impl Into<String>, port: u16) -> Self {
-        self.mqtt_host = Some(host.into());
-        self.mqtt_port = Some(port);
-        self
-    }
-
-    pub fn mqtt_client_id(mut self, id: impl Into<String>) -> Self {
-        self.mqtt_client_id = id.into();
-        self
-    }
-
-    // Build all clients (AMQP, MQTT)
-    pub async fn build(self) -> Result<Clients, String> {
-        let amqp = if let Some(uri) = self.amqp_uri {
-            let client = AmqpClient::new(&uri)
-                .await
-                .map_err(|e| format!("Failed to connect to AMQP: {e}"))?;
-
-            client
-                .start_response_listener(&self.amqp_response_exchange, &self.amqp_response_queue)
-                .await
-                .map_err(|e| format!("Failed to start AMQP response listener: {e}"))?;
-
-            Some(Arc::new(client))
-        } else {
-            tracing::warn!("AMQP Client is not configured, skipping");
-            None
-        };
-
-        let mqtt = if let (Some(host), Some(port)) = (self.mqtt_host, self.mqtt_port) {
-            let handle = mqtt_setup(&self.mqtt_client_id, &host, port)
-                .map_err(|e| format!("Failed to setup MQTT: {e}"))?;
-            Some(Arc::new(handle))
-        } else {
-            tracing::warn!("MQTT Client is not configured, skipping");
-            None
-        };
-
-        Ok(Clients { amqp, mqtt })
-    }
 }
 
 // Spawn the Bevy executor in a separate thread

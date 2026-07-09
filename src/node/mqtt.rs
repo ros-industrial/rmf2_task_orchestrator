@@ -464,14 +464,14 @@ fn register_mqtt_device_req_node(
 mod tests {
     use crossflow::{Diagram, DiagramElementRegistry, testing::*};
     use crossflow::bevy_app::App;
-    use crate::client::mqtt::mqtt_setup;
+    use crate::client::mqtt::MqttHandle;
     use serde_json::json;
     use std::sync::Arc;
     use std::time::Duration;
     use super::*;
 
     fn register_nodes(app: &mut App, registry: &mut DiagramElementRegistry) {
-        let mqtt_handle = mqtt_setup("test-client", "localhost", 1883).expect(
+        let mqtt_handle = MqttHandle::connect("test-client", "localhost", 1883).expect(
             "Mosquitto must be running for MQTT setup"
         );
         crate::node::mqtt::register(app, registry, Arc::new(mqtt_handle));

@@ -207,27 +207,35 @@ pub struct AmqpClient {
 }
 
 impl AmqpClient {
-    pub async fn new(uri: &str) -> Result<Self, AmqpError> {
+    pub async fn connect(
+        uri: &str,
+        response_exchange: &str,
+        response_queue: &str,
+    ) -> Result<Self, AmqpError> {
         let connection = Connection::connect(uri, ConnectionProperties::default())
             .await
             .map_err(|e| AmqpError::Connection(e.to_string()))?;
         tracing::info!("AmqpClient connected to {}", uri);
 
-        // Create a reusable channel for publishing
         let publish_channel = connection.create_channel().await?;
         tracing::debug!("Created publish channel");
 
         let pending_responses: PendingResponses = Arc::new(TokioMutex::new(HashMap::new()));
 
-        Ok(Self {
+        let client = Self {
             connection: Arc::new(connection),
             publish_channel: Arc::new(publish_channel),
             pending_responses,
-        })
+        };
+
+        client
+            .start_response_listener(response_exchange, response_queue)
+            .await?;
+
+        Ok(client)
     }
 
-    // Start the shared response listener - call once after creating the client
-    pub async fn start_response_listener(
+    async fn start_response_listener(
         &self,
         response_exchange: &str,
         response_queue: &str,
