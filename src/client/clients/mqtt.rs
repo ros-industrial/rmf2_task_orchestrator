@@ -73,39 +73,41 @@ impl MqttHandle {
     }
 }
 
-pub fn mqtt_setup(
-    client_id: &str,
-    mqtt_host: &str,
-    mqtt_port: u16,
-) -> Result<MqttHandle, Box<dyn std::error::Error>> {
-    let mut mqttoptions = MqttOptions::new(client_id, mqtt_host, mqtt_port);
-    mqttoptions.set_keep_alive(Duration::from_secs(5));
-    tracing::info!("MQTT connecting to {}:{} (client_id={})", mqtt_host, mqtt_port, client_id);
-    let (client, mut eventloop) = AsyncClient::new(mqttoptions, 64);
-    let subscriptions: Arc<DashMap<String, broadcast::Sender<MqttMessage>>> = Arc::new(DashMap::new());
-    let subs = subscriptions.clone();
-    tokio::spawn(async move {
-        loop {
-            match eventloop.poll().await {
-                Ok(Event::Incoming(Packet::Publish(publish))) => {
-                    if let Some(tx) = subs.get(publish.topic.as_str()) {
-                        // Err here will signal that no more receivers are active, drop the tx and subscription topic
-                        if tx.send(publish.payload.to_vec()).is_err() {
-                            drop(tx);
-                            subs.remove(publish.topic.as_str());
-                            tracing::debug!("MQTT: no receivers on {}, unsubscribed", publish.topic);
+impl MqttHandle {
+    pub fn connect(
+        client_id: &str,
+        host: &str,
+        port: u16,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut mqttoptions = MqttOptions::new(client_id, host, port);
+        mqttoptions.set_keep_alive(Duration::from_secs(5));
+        tracing::info!("MQTT connecting to {}:{} (client_id={})", host, port, client_id);
+        let (client, mut eventloop) = AsyncClient::new(mqttoptions, 64);
+        let subscriptions: Arc<DashMap<String, broadcast::Sender<MqttMessage>>> = Arc::new(DashMap::new());
+        let subs = subscriptions.clone();
+        tokio::spawn(async move {
+            loop {
+                match eventloop.poll().await {
+                    Ok(Event::Incoming(Packet::Publish(publish))) => {
+                        if let Some(tx) = subs.get(publish.topic.as_str()) {
+                            // Err here will signal that no more receivers are active, drop the tx and subscription topic
+                            if tx.send(publish.payload.to_vec()).is_err() {
+                                drop(tx);
+                                subs.remove(publish.topic.as_str());
+                                tracing::debug!("MQTT: no receivers on {}, unsubscribed", publish.topic);
+                            }
                         }
                     }
-                }
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::warn!("MQTT connection error, reconnecting... {e}");
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!("MQTT connection error, reconnecting... {e}");
+                    }
                 }
             }
-        }
-    });
-    Ok(MqttHandle {
-        client,
-        subscriptions,
-    })
+        });
+        Ok(Self {
+            client,
+            subscriptions,
+        })
+    }
 }

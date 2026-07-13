@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-use amqp::{AmqpConnection, run_consumer};
-use axum::{http::StatusCode, routing::get};
+use rmf2_task_orchestrator::client::{AmqpConnection, run_consumer};
 use rmf2_task_orchestrator::config::load_base_configuration;
+use rmf2_task_orchestrator::{Clients, create_amqp_router, spawn};
+use axum::{http::StatusCode, routing::get};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use workflow_executor::{ClientsBuilder, create_amqp_router, spawn};
 
 async fn health_check() -> StatusCode {
     StatusCode::OK
@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("{}=debug", env!("CARGO_CRATE_NAME")).into()),
+                .unwrap_or_else(|_| format!("{}=info", env!("CARGO_CRATE_NAME")).into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -42,30 +42,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let amqp_config = &config.task_orchestrator.amqp;
     let mqtt_config = &config.task_orchestrator.mqtt;
 
-    // Build all clients (AMQP, MQTT)
-    let clients = ClientsBuilder::new()
-        .amqp(amqp_config.to_url())
-        .amqp_response("@RECEIVE@", "@RECEIVE@-task-responses")
-        .mqtt(&mqtt_config.host, mqtt_config.port)
-        .mqtt_client_id("TaskOrchestrator-MQTT")
-        .build()
-        .await?;
+    let clients = Clients::connect(amqp_config, mqtt_config).await?;
 
-    // Spawn the Bevy executor
     let http_config = &config.task_orchestrator.http;
     let executor_url = format!("http://{}:{}", http_config.host, http_config.port);
     let (executor_handle, editor_router) = spawn(clients, executor_url).await?;
 
-    // Establish a connection object for the AMQP consumer
     let amqp_connection = AmqpConnection::new(&amqp_config.to_url())
         .await
         .map_err(|e| format!("Failed to connect to AMQP broker: {e}"))?;
 
-    // AMQP consumer forwards workflow execution to /api/executor/run
     let amqp_router = create_amqp_router(executor_handle);
     tokio::spawn(run_consumer(amqp_connection, amqp_config.consumer.clone(), amqp_router));
 
-    // Build the main HTTP app router
     let app = editor_router.route("/health_check", get(health_check));
 
     let listener = tokio::net::TcpListener::bind((

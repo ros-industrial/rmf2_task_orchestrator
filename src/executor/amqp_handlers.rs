@@ -16,10 +16,9 @@
  * limitations under the License.
  */
 
-use amqp::AmqpError;
+use crate::client::amqp::AmqpError;
+use crate::executor::ExecutorHandle;
 use serde::Deserialize;
-
-use super::state::ExecutorHandle;
 
 // AMQP message containing a workflow execution request.
 // The workflow diagram is embedded in the payload field.
