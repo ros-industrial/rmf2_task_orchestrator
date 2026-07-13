@@ -1,0 +1,27 @@
+name: build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+  services:
+    mosquitto:
+      image: eclipse-mosquitto:2
+      ports:
+        - 1883:1883
+    rabbitmq:
+      image: rabbitmq:3
+      ports:
+        - 5672:5672
+  
+  steps:
+    - uses: actions/checkout@v4
+
+    - run: cargo build
+    
+    - run: cargo test
+  

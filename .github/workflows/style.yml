@@ -1,0 +1,22 @@
+name: style
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  Style: 
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: rustfmt
+        run: rustup component add rustfmt
+
+      - name: style
+        run: cargo fmt --all --check
+
+      - name: clippy
+        run: cargo clippy
+  
+  
