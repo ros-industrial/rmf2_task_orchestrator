@@ -8,20 +8,19 @@ on:
 jobs:
   Build:
     runs-on: ubuntu-latest
-  services:
-    mosquitto:
-      image: eclipse-mosquitto:2
-      ports:
-        - 1883:1883
-    rabbitmq:
-      image: rabbitmq:3
-      ports:
-        - 5672:5672
-  
-  steps:
-    - uses: actions/checkout@v4
+    services:
+      rabbitmq:
+        image: rabbitmq:3
+        ports:
+          - 5672:5672
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mosquitto
+        uses: namoshek/mosquitto-github-action@v1
+        with:
+          ports: '1883:1883'
+          config: .github/mosquitto.conf
 
-    - run: cargo build
-    
-    - run: cargo test
+      - run: cargo build
+      - run: cargo test
   
