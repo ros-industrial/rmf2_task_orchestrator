@@ -47,7 +47,7 @@ impl MqttHandle {
     ) -> Result<broadcast::Receiver<MqttMessage>, Box<dyn std::error::Error>> {
         // Clones the tx channel to pass to node if the topic currently has a rx channel opened
         if let Some(tx) = self.subscriptions.get(topic) {
-            return Ok(tx.subscribe())
+            return Ok(tx.subscribe());
         }
         let (tx, rx) = broadcast::channel(16);
         self.client
@@ -81,9 +81,15 @@ impl MqttHandle {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut mqttoptions = MqttOptions::new(client_id, host, port);
         mqttoptions.set_keep_alive(Duration::from_secs(5));
-        tracing::info!("MQTT connecting to {}:{} (client_id={})", host, port, client_id);
+        tracing::info!(
+            "MQTT connecting to {}:{} (client_id={})",
+            host,
+            port,
+            client_id
+        );
         let (client, mut eventloop) = AsyncClient::new(mqttoptions, 64);
-        let subscriptions: Arc<DashMap<String, broadcast::Sender<MqttMessage>>> = Arc::new(DashMap::new());
+        let subscriptions: Arc<DashMap<String, broadcast::Sender<MqttMessage>>> =
+            Arc::new(DashMap::new());
         let subs = subscriptions.clone();
         tokio::spawn(async move {
             loop {
@@ -94,7 +100,10 @@ impl MqttHandle {
                             if tx.send(publish.payload.to_vec()).is_err() {
                                 drop(tx);
                                 subs.remove(publish.topic.as_str());
-                                tracing::debug!("MQTT: no receivers on {}, unsubscribed", publish.topic);
+                                tracing::debug!(
+                                    "MQTT: no receivers on {}, unsubscribed",
+                                    publish.topic
+                                );
                             }
                         }
                     }

@@ -37,9 +37,7 @@ pub(crate) fn register(registry: &mut DiagramElementRegistry, amqp_client: Arc<A
     register_delay_node(registry, amqp_client);
 }
 
-fn register_default_node(
-    registry: &mut DiagramElementRegistry,
-) {
+fn register_default_node(registry: &mut DiagramElementRegistry) {
     registry.register_node_builder(
         NodeBuilderOptions::new("DefaultNode").with_default_display_text("Default"),
         move |builder, config: DefaultNodeConfig| {
@@ -174,10 +172,7 @@ struct AmqpTaskConfig {
 }
 
 // GoTo Node - publishes a GoTo task request via AMQP and waits for TaskStatus response
-fn register_goto_node(
-    registry: &mut DiagramElementRegistry,
-    amqp_client: Arc<AmqpClient>,
-) {
+fn register_goto_node(registry: &mut DiagramElementRegistry, amqp_client: Arc<AmqpClient>) {
     registry.register_node_builder(
         NodeBuilderOptions::new("GoToNode").with_default_display_text("GoTo"),
         move |builder, config: AmqpTaskConfig| {

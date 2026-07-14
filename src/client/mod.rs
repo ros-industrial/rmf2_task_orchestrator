@@ -17,8 +17,8 @@
  */
 
 mod clients;
-pub(crate) use clients::*;
 pub use clients::amqp::{AmqpConnection, run_consumer};
+pub(crate) use clients::*;
 
 use crate::config::{AmqpSettings, MqttSettings};
 use clients::amqp::AmqpClient;
@@ -48,8 +48,9 @@ impl Clients {
         };
 
         let mqtt = {
-            let handle = MqttHandle::connect("TaskOrchestrator-MQTT", &mqtt_config.host, mqtt_config.port)
-                .map_err(|e| format!("Failed to connect to MQTT: {e}"))?;
+            let handle =
+                MqttHandle::connect("TaskOrchestrator-MQTT", &mqtt_config.host, mqtt_config.port)
+                    .map_err(|e| format!("Failed to connect to MQTT: {e}"))?;
             Some(Arc::new(handle))
         };
 

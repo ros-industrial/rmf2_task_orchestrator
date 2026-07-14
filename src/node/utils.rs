@@ -17,10 +17,10 @@
  */
 
 use cel_interpreter::{Context, Program, Value};
-use crossflow::prelude::*;
 use crossflow::ConfigExample;
 use crossflow::bevy_ecs::prelude::Res;
 use crossflow::bevy_time::Time;
+use crossflow::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -35,9 +35,8 @@ pub(crate) fn register(registry: &mut DiagramElementRegistry) {
     register_consume_message_node(registry);
 }
 
-fn register_cel_eval_condition_node(
-    registry: &mut DiagramElementRegistry) {
-        registry.register_node_builder(
+fn register_cel_eval_condition_node(registry: &mut DiagramElementRegistry) {
+    registry.register_node_builder(
             NodeBuilderOptions::new("cel_condition")
             .with_default_display_text("CEL Condition")
             .with_description("Evaluates a bool condition. If true, returns Ok, else returns Err.
@@ -54,16 +53,16 @@ fn register_cel_eval_condition_node(
             }
         )
         .with_result();
-    }
+}
 
 pub(crate) fn eval_condition_node(
     builder: &mut Builder,
     config: CelConditionEvalConfig,
-) -> Node<JsonMessage, Result<JsonMessage, JsonMessage>>{
+) -> Node<JsonMessage, Result<JsonMessage, JsonMessage>> {
     let condition = config.condition;
-    builder.create_map_block(move | request: JsonMessage| {
+    builder.create_map_block(move |request: JsonMessage| {
         if condition.is_empty() {
-            return Ok(request)
+            return Ok(request);
         }
         match eval_condition(&condition, &request) {
             Ok(true) => Ok(request),
@@ -82,12 +81,11 @@ pub(crate) fn eval_condition_node(
 /// Evaluates a message with a condition.
 /// For evaluating a JSON obj, eg. {"Err":{"Timeout": {"Code": 404}}}, can be written as Err.Timeout.Code == 404 instead of message.Err.Timeout.Code == 404
 /// If it is a primitive, will still be referred to by the message var eg. message == 40. For a list, will require index eg. message[0] == 404
-pub(crate) fn eval_condition(
-    condition: &str, message: &JsonMessage) -> Result<bool, String> {
-    let program = Program::compile(condition)
-        .map_err(|e| format!("CEL compile error: {e}"))?;
+pub(crate) fn eval_condition(condition: &str, message: &JsonMessage) -> Result<bool, String> {
+    let program = Program::compile(condition).map_err(|e| format!("CEL compile error: {e}"))?;
     let mut context = Context::default();
-    context.add_variable("message", message.clone())
+    context
+        .add_variable("message", message.clone())
         .map_err(|e| format!("CEL context error: {e}"))?;
     // If message is a JSON object we flatten it so that the user does not need to know about the message variable.
     if let Some(obj) = message.as_object() {
@@ -97,10 +95,10 @@ pub(crate) fn eval_condition(
     }
     match program.execute(&context) {
         Ok(Value::Bool(b)) => Ok(b),
-        Ok(_) => Err(format!("CEL condition must return bool")),
+        Ok(_) => Err("CEL condition must return bool".to_string()),
         Err(e) => Err(format!("CEL evaluation error: {e}")),
     }
-} 
+}
 
 /// Timer service. Will be used for timeout for nodes (Fork clone race condition)
 pub(crate) fn timer_countdown(
@@ -131,16 +129,18 @@ pub(crate) fn timer_countdown(
 
 #[derive(StreamPack)]
 pub(crate) struct MessageStream {
-    pub message: JsonMessage
+    pub message: JsonMessage,
 }
 
 #[derive(Accessor, Clone)]
 pub(crate) struct ConsumeMessageKey {
-    pub message: BufferKey<JsonMessage>
+    pub message: BufferKey<JsonMessage>,
 }
 
 pub(crate) fn consume_message(
-    Blocking {request: keys, id, .. }: Blocking<ConsumeMessageKey>,
+    Blocking {
+        request: keys, id, ..
+    }: Blocking<ConsumeMessageKey>,
     mut message_access: BufferAccess<JsonMessage>,
 ) -> Option<JsonMessage> {
     let msg = message_access.get_newest(id, &keys.message)?;
@@ -156,14 +156,14 @@ fn register_consume_message_node(registry: &mut DiagramElementRegistry) {
             NodeBuilderOptions::new("consume_message")
                 .with_description("Generic consumer used to consume JSON msgs from buffers"),
             |builder, _config: ()| {
-            let n = builder.create_node(consume_message.into_callback());
-            let output = builder.chain(n.output).dispose_on_none().output();
-            Node::<ConsumeMessageKey, _> {
-                input: n.input,
-                output,
-                streams: n.streams,
-            }
-            }
+                let n = builder.create_node(consume_message.into_callback());
+                let output = builder.chain(n.output).dispose_on_none().output();
+                Node::<ConsumeMessageKey, _> {
+                    input: n.input,
+                    output,
+                    streams: n.streams,
+                }
+            },
         )
         .with_listen();
 }

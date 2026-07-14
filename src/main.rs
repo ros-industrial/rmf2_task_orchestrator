@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
+use axum::{http::StatusCode, routing::get};
 use rmf2_task_orchestrator::client::{AmqpConnection, run_consumer};
 use rmf2_task_orchestrator::config::load_base_configuration;
 use rmf2_task_orchestrator::{Clients, create_amqp_router, spawn};
-use axum::{http::StatusCode, routing::get};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 async fn health_check() -> StatusCode {
@@ -53,7 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|e| format!("Failed to connect to AMQP broker: {e}"))?;
 
     let amqp_router = create_amqp_router(executor_handle);
-    tokio::spawn(run_consumer(amqp_connection, amqp_config.consumer.clone(), amqp_router));
+    tokio::spawn(run_consumer(
+        amqp_connection,
+        amqp_config.consumer.clone(),
+        amqp_router,
+    ));
 
     let app = editor_router.route("/health_check", get(health_check));
 

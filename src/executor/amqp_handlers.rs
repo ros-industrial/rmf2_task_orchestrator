@@ -47,7 +47,8 @@ pub async fn handle_workflow_execute(
 
     tracing::info!(
         "Received AMQP workflow execute: task_id={}, task_type={}",
-        message.task_id, message.task_type
+        message.task_id,
+        message.task_type
     );
 
     // The payload contains the diagram JSON (either as a string or object)
@@ -89,7 +90,9 @@ pub async fn handle_workflow_execute(
         let body = response.text().await.unwrap_or_default();
         tracing::error!(
             "Workflow {} failed to execute: {} - {}",
-            message.task_id, status, body
+            message.task_id,
+            status,
+            body
         );
         Err(AmqpError::Workflow(format!("{status}: {body}")))
     }
