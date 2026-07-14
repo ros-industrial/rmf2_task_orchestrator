@@ -7,8 +7,33 @@ on:
     branches: [main]
 
 jobs:
-  Build:
-    runs-on: ubuntu-latest
+  style:
+    runs-on: ${{ matrix.ubuntu_distribution }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu_distribution:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: style
+        run: cargo fmt --all --check
+
+      - name: clippy
+        run: cargo clippy
+
+  build:
+    runs-on: ${{ matrix.ubuntu_distribution }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu_distribution:
+          - ubuntu-22.04
+          - ubuntu-24.04
     services:
       rabbitmq:
         image: rabbitmq:3
@@ -16,20 +41,14 @@ jobs:
           - 5672:5672
     steps:
       - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
       - name: Mosquitto
         uses: namoshek/mosquitto-github-action@v1
         with:
           ports: '1883:1883'
           config: ${{ github.workspace }}/.github/mosquitto.conf
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: latest
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
       - run: cargo build
       - run: cargo test
-  
