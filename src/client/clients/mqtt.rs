@@ -19,9 +19,15 @@
 use crossflow::bevy_ecs;
 use dashmap::DashMap;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast;
+
+#[derive(serde::Deserialize, Clone)]
+pub struct MqttSettings {
+    pub host: String,
+    pub port: u16,
+}
 
 pub type MqttMessage = Vec<u8>;
 
@@ -118,5 +124,28 @@ impl MqttHandle {
             client,
             subscriptions,
         })
+    }
+}
+
+#[derive(serde::Deserialize, Clone)]
+pub struct MqttTomlFormat {
+    pub mqtt_client: MqttSettings,
+}
+
+#[derive(Clone)]
+struct EnsureMqtt(Arc<Mutex<Option<MqttSettings>>>);
+
+impl EnsureMqtt {
+    fn new(config: Option<MqttSettings>) -> Self {
+        Self(Arc::new(Mutex::new(Some(match config {
+            Some(c) => c,
+            None => Self::load_config(),
+        }))))
+    }
+
+    fn load_config() -> MqttSettings {
+        crate::config::load_base_configuration::<MqttTomlFormat>()
+            .unwrap()
+            .mqtt_client
     }
 }
