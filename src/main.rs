@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let config =
+    let config: Settings =
         load_base_configuration().map_err(|e| format!("Error loading config file: {e}"))?;
 
     let amqp_config = &config.task_orchestrator.amqp;

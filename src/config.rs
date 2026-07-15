@@ -93,7 +93,10 @@ impl Environment {
     }
 }
 
-pub fn load_base_configuration() -> Result<Settings, config::ConfigError> {
+pub fn load_base_configuration<T>() -> Result<T, config::ConfigError>
+where
+    T: serde::de::DeserializeOwned,
+{
     let mut builder = config::Config::builder()
         .add_source(config::File::new("config.toml", config::FileFormat::Toml));
     let env = Environment::from_env();
@@ -114,5 +117,5 @@ pub fn load_base_configuration() -> Result<Settings, config::ConfigError> {
     dotenvy::from_filename(env_file).ok();
     builder = builder.add_source(config::Environment::default().separator("__"));
 
-    builder.build()?.try_deserialize::<Settings>()
+    builder.build()?.try_deserialize::<T>()
 }
