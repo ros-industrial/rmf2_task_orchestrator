@@ -8,15 +8,9 @@ on:
 
 jobs:
   style:
-    runs-on: ${{ matrix.ubuntu_distribution }}
-    strategy:
-      fail-fast: false
-      matrix:
-        ubuntu_distribution:
-          - ubuntu-22.04
-          - ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup
 
@@ -27,28 +21,26 @@ jobs:
         run: cargo clippy
 
   build:
-    runs-on: ${{ matrix.ubuntu_distribution }}
-    strategy:
-      fail-fast: false
-      matrix:
-        ubuntu_distribution:
-          - ubuntu-22.04
-          - ubuntu-24.04
+    runs-on: ubuntu-latest
     services:
       rabbitmq:
         image: rabbitmq:3
         ports:
           - 5672:5672
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: ./.github/actions/setup
 
-      - name: Mosquitto
-        uses: namoshek/mosquitto-github-action@v1
-        with:
-          ports: '1883:1883'
-          config: ${{ github.workspace }}/.github/mosquitto.conf
+      - name: Install mosquitto
+        run: |
+          apt-get update -qq -y
+          apt-get install libpaho-mqtt-dev libpaho-mqttpp-dev mosquitto -qq -y
+      
+      - name: Start MQTT broker
+        run: |
+          mosquitto -d
+          sleep 2
 
       - run: cargo build
       - run: cargo test
