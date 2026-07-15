@@ -20,22 +20,17 @@ mod clients;
 pub use clients::amqp::{AmqpConnection, run_consumer};
 pub(crate) use clients::*;
 
-use crate::config::{AmqpSettings, MqttSettings};
+use crate::config::AmqpSettings;
 use clients::amqp::AmqpClient;
-use clients::mqtt::MqttHandle;
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Clients {
     pub(crate) amqp: Option<Arc<AmqpClient>>,
-    pub(crate) mqtt: Option<Arc<MqttHandle>>,
 }
 
 impl Clients {
-    pub async fn connect(
-        amqp_config: &AmqpSettings,
-        mqtt_config: &MqttSettings,
-    ) -> Result<Self, String> {
+    pub async fn connect(amqp_config: &AmqpSettings) -> Result<Self, String> {
         let amqp = {
             let client = AmqpClient::connect(
                 &amqp_config.to_url(),
@@ -47,13 +42,6 @@ impl Clients {
             Some(Arc::new(client))
         };
 
-        let mqtt = {
-            let handle =
-                MqttHandle::connect("TaskOrchestrator-MQTT", &mqtt_config.host, mqtt_config.port)
-                    .map_err(|e| format!("Failed to connect to MQTT: {e}"))?;
-            Some(Arc::new(handle))
-        };
-
-        Ok(Self { amqp, mqtt })
+        Ok(Self { amqp })
     }
 }

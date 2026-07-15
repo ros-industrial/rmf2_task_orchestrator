@@ -47,17 +47,10 @@ impl AmqpSettings {
 pub struct TaskOrchestratorSettings {
     pub http: HttpSettings,
     pub amqp: AmqpSettings,
-    pub mqtt: MqttSettings,
 }
 
 #[derive(serde::Deserialize, Clone)]
 pub struct HttpSettings {
-    pub port: u16,
-    pub host: String,
-}
-
-#[derive(serde::Deserialize, Clone)]
-pub struct MqttSettings {
     pub port: u16,
     pub host: String,
 }

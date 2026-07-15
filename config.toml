@@ -6,7 +6,7 @@ port = 2727
 host = "localhost"
 port = 5672
 
-[task_orchestrator.mqtt]
+[mqtt_client]
 host = "localhost"
 port = 1883
 

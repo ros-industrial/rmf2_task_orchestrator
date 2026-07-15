@@ -40,9 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         load_base_configuration().map_err(|e| format!("Error loading config file: {e}"))?;
 
     let amqp_config = &config.task_orchestrator.amqp;
-    let mqtt_config = &config.task_orchestrator.mqtt;
 
-    let clients = Clients::connect(amqp_config, mqtt_config).await?;
+    let clients = Clients::connect(amqp_config).await?;
 
     let http_config = &config.task_orchestrator.http;
     let executor_url = format!("http://{}:{}", http_config.host, http_config.port);
