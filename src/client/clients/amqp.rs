@@ -72,17 +72,12 @@ type HandlerResult = Result<(), AmqpError>;
 pub type HandlerFn =
     Arc<dyn Fn(Vec<u8>) -> Pin<Box<dyn Future<Output = HandlerResult> + Send>> + Send + Sync>;
 
+#[derive(Default)]
 pub struct AmqpRouter {
     handlers: HashMap<String, HandlerFn>,
 }
 
 impl AmqpRouter {
-    pub fn new() -> Self {
-        Self {
-            handlers: HashMap::new(),
-        }
-    }
-
     pub fn route<F, Fut>(mut self, routing_key: &str, handler: F) -> Self
     where
         F: Fn(Vec<u8>) -> Fut + Send + Sync + 'static,
@@ -105,7 +100,9 @@ pub async fn run_consumer(
 ) -> Result<(), AmqpError> {
     tracing::info!(
         "AMQP consumer listening on exchange={}, queue={}, kind={}",
-        config.exchange, config.queue, config.exchange_kind
+        config.exchange,
+        config.queue,
+        config.exchange_kind
     );
     let channel = connection.create_channel().await?;
     channel
@@ -125,7 +122,7 @@ pub async fn run_consumer(
         let channel = connection.create_channel().await?;
         channel
             .queue_declare(
-                &queue_name,
+                queue_name,
                 QueueDeclareOptions {
                     durable: true,
                     ..Default::default()
@@ -135,7 +132,7 @@ pub async fn run_consumer(
             .await?;
         channel
             .queue_bind(
-                &queue_name,
+                queue_name,
                 &config.exchange,
                 &config.routing_key,
                 QueueBindOptions::default(),
@@ -146,7 +143,7 @@ pub async fn run_consumer(
 
         let consumer = channel
             .basic_consume(
-                &queue_name,
+                queue_name,
                 &format!("consumer_{}", queue_name),
                 BasicConsumeOptions::default(),
                 FieldTable::default(),
@@ -164,11 +161,11 @@ async fn consumer_loop(mut consumer: Consumer, handler: HandlerFn, routing_key: 
     while let Some(delivery) = consumer.next().await {
         match delivery {
             Ok(delivery) => {
-                if let Ok(peek) = serde_json::from_slice::<serde_json::Value>(&delivery.data) {
-                    if peek.get("type").and_then(|t| t.as_str()) != Some("Schedule") {
-                        let _ = delivery.ack(BasicAckOptions::default()).await;
-                        continue;
-                    }
+                if let Ok(peek) = serde_json::from_slice::<serde_json::Value>(&delivery.data)
+                    && peek.get("type").and_then(|t| t.as_str()) != Some("Schedule")
+                {
+                    let _ = delivery.ack(BasicAckOptions::default()).await;
+                    continue;
                 }
 
                 let routing_key = routing_key.clone();
@@ -317,29 +314,29 @@ impl AmqpClient {
                             }
                         });
 
-                        if msg_type == Some("TaskStatus") {
-                            if let Some(full_id) = msg_id {
-                                let task_id = full_id.trim_end_matches(":TaskStatus");
+                        if msg_type == Some("TaskStatus")
+                            && let Some(full_id) = msg_id
+                        {
+                            let task_id = full_id.trim_end_matches(":TaskStatus");
 
-                                tracing::debug!(
-                                    "Response listener: TaskStatus for {} status={:?}",
-                                    task_id,
-                                    status
-                                );
+                            tracing::debug!(
+                                "Response listener: TaskStatus for {} status={:?}",
+                                task_id,
+                                status
+                            );
 
-                                if status == Some("COMPLETED") || status == Some("ERROR") {
-                                    let mut pending_mutex = pending.lock().await;
-                                    if let Some(senders) = pending_mutex.remove(task_id) {
-                                        let waiter_count = senders.len();
-                                        for sender in senders {
-                                            let _ = sender.send(delivery.data.clone());
-                                        }
-                                        tracing::info!(
-                                            "Response listener: Signaled {} waiter(s) for {}",
-                                            waiter_count,
-                                            task_id
-                                        );
+                            if status == Some("COMPLETED") || status == Some("ERROR") {
+                                let mut pending_mutex = pending.lock().await;
+                                if let Some(senders) = pending_mutex.remove(task_id) {
+                                    let waiter_count = senders.len();
+                                    for sender in senders {
+                                        let _ = sender.send(delivery.data.clone());
                                     }
+                                    tracing::info!(
+                                        "Response listener: Signaled {} waiter(s) for {}",
+                                        waiter_count,
+                                        task_id
+                                    );
                                 }
                             }
                         }
@@ -411,10 +408,10 @@ impl AmqpClient {
             Ok(data) => Ok(data),
             Err(_) => {
                 let mut pending = self.pending_responses.lock().await;
-                if let Some(waiters) = pending.get_mut(task_id) {
-                    if waiters.is_empty() {
-                        pending.remove(task_id);
-                    }
+                if let Some(waiters) = pending.get_mut(task_id)
+                    && waiters.is_empty()
+                {
+                    pending.remove(task_id);
                 }
                 Err(AmqpError::Channel(format!(
                     "Response sender dropped for task {}",

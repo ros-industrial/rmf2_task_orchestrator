@@ -24,8 +24,8 @@ use crate::node;
 use amqp_handlers::handle_workflow_execute;
 
 use axum::Router;
-use crossflow::{CrossflowExecutorApp, DiagramElementRegistry, bevy_app};
 use crossflow::bevy_time::TimePlugin;
+use crossflow::{CrossflowExecutorApp, DiagramElementRegistry, bevy_app};
 use crossflow_diagram_editor::{ServerOptions, new_router};
 use std::thread;
 use tokio::sync::oneshot;
@@ -36,12 +36,15 @@ pub struct ExecutorHandle {
 }
 
 // Spawn the Bevy executor in a separate thread
-pub async fn spawn(clients: Clients, executor_url: String) -> Result<(ExecutorHandle, Router), String> {
+pub async fn spawn(
+    clients: Clients,
+    executor_url: String,
+) -> Result<(ExecutorHandle, Router), String> {
     let (router_tx, router_rx) = oneshot::channel();
 
     thread::spawn(move || {
         let mut app = bevy_app::App::new();
-        app.add_plugins((CrossflowExecutorApp::default(), TimePlugin::default()));
+        app.add_plugins((CrossflowExecutorApp::default(), TimePlugin));
 
         let mut registry = DiagramElementRegistry::new();
         if let Some(amqp_client) = &clients.amqp {
@@ -68,7 +71,7 @@ pub async fn spawn(clients: Clients, executor_url: String) -> Result<(ExecutorHa
 }
 
 pub fn create_amqp_router(handle: ExecutorHandle) -> AmqpRouter {
-    AmqpRouter::new().route("", {
+    AmqpRouter::default().route("", {
         let handle = handle.clone();
         move |data| {
             let handle = handle.clone();

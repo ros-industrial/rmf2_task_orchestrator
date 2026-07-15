@@ -1,0 +1,46 @@
+name: build
+
+on:
+  pull_request:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: style
+        run: cargo fmt --all --check
+
+      - name: clippy
+        run: cargo clippy
+
+  build:
+    runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq:3
+        ports:
+          - 5672:5672
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup
+
+      - name: Install mosquitto
+        run: |
+          sudo apt-get update -qq -y
+          sudo apt-get install libpaho-mqtt-dev libpaho-mqttpp-dev mosquitto -qq -y
+      
+      - name: Start MQTT broker
+        run: |
+          mosquitto -d
+          sleep 2
+
+      - run: cargo build
+      - run: cargo test

@@ -17,11 +17,13 @@
  */
 
 use crate::client::mqtt::MqttHandle;
-use crate::node::utils::{CelConditionEvalConfig, ConsumeMessageKey, MessageStream, consume_message, eval_condition_node};
+use crate::node::utils::{
+    CelConditionEvalConfig, ConsumeMessageKey, MessageStream, consume_message, eval_condition_node,
+};
 
-use crossflow::prelude::*;
 use crossflow::ConfigExample;
 use crossflow::bevy_ecs::prelude::Res;
+use crossflow::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -36,9 +38,7 @@ pub enum MqttNodeError {
     #[error("Parse failed: {0}")]
     Parse(String),
     #[error("Timeout on {topic}")]
-    Timeout {
-        topic: String,
-    },
+    Timeout { topic: String },
     #[error("Condition error: {0}")]
     Condition(String),
     #[error("Unknown error")]
@@ -65,7 +65,10 @@ pub(crate) fn register(
     mqtt_handle: Arc<MqttHandle>,
 ) {
     app.insert_resource(mqtt_handle.as_ref().clone());
-    let timer_service = app.spawn_continuous_service(crossflow::bevy_app::Update, crate::node::utils::timer_countdown);
+    let timer_service = app.spawn_continuous_service(
+        crossflow::bevy_app::Update,
+        crate::node::utils::timer_countdown,
+    );
     register_mqtt_publish_node(registry);
     register_mqtt_subscribe_node(registry, timer_service);
     register_mqtt_listen_node(registry);
@@ -103,13 +106,16 @@ fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry) {
 
 fn mqtt_publish_node(
     builder: &mut Builder,
-    config: MqttPublishConfig
+    config: MqttPublishConfig,
 ) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
-    let MqttPublishConfig { topic, payload, qos, retain } = config;
-    let callback = move |
-        Async { request, .. }: Async<JsonMessage>,
-        mqtt_handle: Res<MqttHandle>,
-    | {
+    let MqttPublishConfig {
+        topic,
+        payload,
+        qos,
+        retain,
+    } = config;
+    let callback = move |Async { request, .. }: Async<JsonMessage>,
+                         mqtt_handle: Res<MqttHandle>| {
         let topic = topic.clone();
         let payload = payload.clone();
         let mqtt = mqtt_handle.clone();
@@ -119,7 +125,8 @@ fn mqtt_publish_node(
             } else {
                 tracing::warn!("MqttPublish: no config payload, publishing upstream input");
                 serde_json::to_vec(&request)
-            }.map_err(|e| MqttNodeError::Parse(e.to_string()))?;
+            }
+            .map_err(|e| MqttNodeError::Parse(e.to_string()))?;
 
             mqtt.publish(&topic, data, qos, retain)
                 .await
@@ -147,79 +154,93 @@ fn default_qos() -> u8 {
     0
 }
 
-fn register_mqtt_subscribe_node(registry: &mut DiagramElementRegistry, timer_service:
-  Service<((), BufferKey<f32>), ()>) {
-      registry
-          .register_node_builder(
-              NodeBuilderOptions::new("mqtt_subscribe_and_wait")
-                  .with_default_display_text("MQTT Subscribe and wait")
-                  .with_description("Subscribe to an MQTT topic and wait for a CEL condition with a timeout.")
-                  .with_config_examples([
-                      ConfigExample::new(
-                          "Wait for device to be IDLE",
-                          MqttSubscribeAndWaitConfig {
-                              topic: "asset/ManipulatorRobot1/asset_status".into(),
-                              condition: "message.state == 'IDLE'".into(),
-                              ..Default::default()
-                          },
-                      ),
-                      ConfigExample::new(
-                          "Wait for task completion or failure",
-                          MqttSubscribeAndWaitConfig {
-                              topic: "asset/ManipulatorRobot1/task_status".into(),
-                              condition: "message.status == 'COMPLETED' || message.status == 
-  'FAILED'".into(),
-                              timeout_secs: 300.0,
-                              ..Default::default()
-                          },
-                      ),
-                  ]),
-              move |builder, config: MqttSubscribeAndWaitConfig| {
-                  mqtt_subscribe_node(builder, config, timer_service)
-              },
-          )
-          .with_result();
-  }
+fn register_mqtt_subscribe_node(
+    registry: &mut DiagramElementRegistry,
+    timer_service: Service<((), BufferKey<f32>), ()>,
+) {
+    registry
+        .register_node_builder(
+            NodeBuilderOptions::new("mqtt_subscribe_and_wait")
+                .with_default_display_text("MQTT Subscribe and wait")
+                .with_description(
+                    "Subscribe to an MQTT topic and wait for a CEL condition with a timeout.",
+                )
+                .with_config_examples([
+                    ConfigExample::new(
+                        "Wait for device to be IDLE",
+                        MqttSubscribeAndWaitConfig {
+                            topic: "asset/ManipulatorRobot1/asset_status".into(),
+                            condition: "message.state == 'IDLE'".into(),
+                            ..Default::default()
+                        },
+                    ),
+                    ConfigExample::new(
+                        "Wait for task completion or failure",
+                        MqttSubscribeAndWaitConfig {
+                            topic: "asset/ManipulatorRobot1/task_status".into(),
+                            condition: "message.status == 'COMPLETED' || message.status == 
+  'FAILED'"
+                                .into(),
+                            timeout_secs: 300.0,
+                            ..Default::default()
+                        },
+                    ),
+                ]),
+            move |builder, config: MqttSubscribeAndWaitConfig| {
+                mqtt_subscribe_node(builder, config, timer_service)
+            },
+        )
+        .with_result();
+}
 
 fn mqtt_subscribe_node(
     builder: &mut Builder,
     config: MqttSubscribeAndWaitConfig,
-    timer_service: Service<((), BufferKey<f32>), ()>
+    timer_service: Service<((), BufferKey<f32>), ()>,
 ) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
-    let MqttSubscribeAndWaitConfig { topic, condition, timeout_secs, qos } = config;
+    let MqttSubscribeAndWaitConfig {
+        topic,
+        condition,
+        timeout_secs,
+        qos,
+    } = config;
     let mqtt_topic = topic.clone();
     // Timeout is achieved by racing the mqtt sub loop with the timeout service using a fork clone. If a message
     // is not received during the timeout duration, returns a timeout error.
     builder.create_io_scope(|scope, builder| {
-        let sub_loop = mqtt_listen_node(builder, MqttListenConfig {topic, qos});
+        let sub_loop = mqtt_listen_node(builder, MqttListenConfig { topic, qos });
         let msg_buffer: Buffer<JsonMessage> = builder.create_buffer(BufferSettings::default());
-        let cel_node = eval_condition_node(builder, CelConditionEvalConfig {
-            condition: condition.clone(),
-        });
+        let cel_node = eval_condition_node(
+            builder,
+            CelConditionEvalConfig {
+                condition: condition.clone(),
+            },
+        );
         builder
             .listen(msg_buffer)
-            .map_block(|key| ConsumeMessageKey {message: key})
+            .map_block(|key| ConsumeMessageKey { message: key })
             .then(consume_message.into_callback())
             .dispose_on_none()
             .connect(cel_node.input);
 
-        builder
-            .chain(cel_node.output)
-            .fork_result(
-            |ok| ok.map_block(|msg| Ok(msg)).connect(scope.terminate),
-            |err| err.unused());
+        builder.chain(cel_node.output).fork_result(
+            |ok| ok.map_block(Ok).connect(scope.terminate),
+            |err| err.unused(),
+        );
         builder
             .chain(sub_loop.streams.message)
             .connect(msg_buffer.input_slot());
 
         let time_buffer: Buffer<f32> = builder.create_buffer(BufferSettings::default());
-        let time_buffer_access= builder.create_buffer_access(time_buffer);
+        let time_buffer_access = builder.create_buffer_access(time_buffer);
 
         builder
             .chain(time_buffer_access.output)
             .then(timer_service)
             .map_block(move |_| {
-                Err(MqttNodeError::Timeout { topic: mqtt_topic.clone() })
+                Err(MqttNodeError::Timeout {
+                    topic: mqtt_topic.clone(),
+                })
             })
             .connect(scope.terminate);
         builder.chain(scope.start).fork_clone((
@@ -232,9 +253,7 @@ fn mqtt_subscribe_node(
                     .connect(time_buffer.input_slot());
             },
             |chain: Chain<_>| {
-                chain
-                    .trigger()
-                    .connect(time_buffer_access.input);
+                chain.trigger().connect(time_buffer_access.input);
             },
         ));
     })
@@ -247,9 +266,7 @@ struct MqttListenConfig {
     pub qos: u8,
 }
 
-fn register_mqtt_listen_node(
-    registry: &mut DiagramElementRegistry
-) {
+fn register_mqtt_listen_node(registry: &mut DiagramElementRegistry) {
     registry
         .register_node_builder(
             NodeBuilderOptions::new("mqtt_listen")
@@ -276,10 +293,8 @@ fn mqtt_listen_node(
     config: MqttListenConfig,
 ) -> Node<JsonMessage, Result<(), MqttNodeError>, MessageStream> {
     let MqttListenConfig { topic, qos } = config;
-    let callback = move |
-        Async { streams, .. }: Async<JsonMessage, MessageStream>,
-        mqtt_handle: Res<MqttHandle>,
-    | {
+    let callback = move |Async { streams, .. }: Async<JsonMessage, MessageStream>,
+                         mqtt_handle: Res<MqttHandle>| {
         let topic = topic.clone();
         let mqtt = mqtt_handle.clone();
         async move {
@@ -353,7 +368,8 @@ fn register_mqtt_device_req_node(
                 async move {
                     tracing::debug!(
                         "MqttDeviceReqNode: asset_id={}, task_type={}",
-                        config.asset_id, config.task_type,
+                        config.asset_id,
+                        config.task_type,
                     );
 
                     let status_topic = format!("asset/{}/asset_status", &config.asset_id);
@@ -388,7 +404,8 @@ fn register_mqtt_device_req_node(
                                 }
                                 tracing::debug!(
                                     "MqttDeviceReqNode: waiting for {} to be IDLE (state={})",
-                                    config.asset_id, update.state
+                                    config.asset_id,
+                                    update.state
                                 );
                             }
                             Err(e) => {
@@ -415,7 +432,8 @@ fn register_mqtt_device_req_node(
 
                     tracing::debug!(
                         "MqttDeviceReqNode: published to {}, waiting for response on {}",
-                        request_topic, response_topic
+                        request_topic,
+                        response_topic
                     );
 
                     loop {
@@ -433,7 +451,8 @@ fn register_mqtt_device_req_node(
                             Ok(update) => {
                                 tracing::debug!(
                                     "MqttDeviceReqNode: task response for {}: status={}",
-                                    config.asset_id, update.status
+                                    config.asset_id,
+                                    update.status
                                 );
                                 if update.status == "COMPLETED" {
                                     break;
@@ -462,18 +481,17 @@ fn register_mqtt_device_req_node(
 
 #[cfg(test)]
 mod tests {
-    use crossflow::{Diagram, DiagramElementRegistry, testing::*};
-    use crossflow::bevy_app::App;
+    use super::*;
     use crate::client::mqtt::MqttHandle;
+    use crossflow::bevy_app::App;
+    use crossflow::{Diagram, DiagramElementRegistry, testing::*};
     use serde_json::json;
     use std::sync::Arc;
     use std::time::Duration;
-    use super::*;
 
     fn register_nodes(app: &mut App, registry: &mut DiagramElementRegistry) {
-        let mqtt_handle = MqttHandle::connect("test-client", "localhost", 1883).expect(
-            "Mosquitto must be running for MQTT setup"
-        );
+        let mqtt_handle = MqttHandle::connect("test-client", "localhost", 1883)
+            .expect("Mosquitto must be running for MQTT setup");
         crate::node::mqtt::register(app, registry, Arc::new(mqtt_handle));
         crate::node::utils::register(registry);
     }
@@ -511,7 +529,11 @@ mod tests {
         let result = ctx.command(|cmds| {
             pub_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
         });
-        assert!(result.is_ok(), "MqttPublish diagram build failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "MqttPublish diagram build failed: {:?}",
+            result.err()
+        );
 
         let sub_diagram = Diagram::from_json(json!({
             "version": "0.1.0",
@@ -540,7 +562,11 @@ mod tests {
         let result = ctx.command(|cmds| {
             sub_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
         });
-        assert!(result.is_ok(), "MqttSubscribe diagram build failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "MqttSubscribe diagram build failed: {:?}",
+            result.err()
+        );
 
         let listen_diagram = Diagram::from_json(json!({
             "version": "0.1.0",
@@ -568,7 +594,11 @@ mod tests {
         let result = ctx.command(|cmds| {
             listen_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
         });
-        assert!(result.is_ok(), "MqttListen diagram build failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "MqttListen diagram build failed: {:?}",
+            result.err()
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -648,18 +678,22 @@ mod tests {
         }))
         .unwrap();
 
-        let service = ctx.command(|cmds| {
-            diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
-        }).expect("MqttListen diagram build failed");
+        let service = ctx
+            .command(|cmds| diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry))
+            .expect("MqttListen diagram build failed");
 
-        let mut outcome = ctx.command(|cmds| {
-            cmds.request(json!({}), service).outcome()
-        });
+        let mut outcome = ctx.command(|cmds| cmds.request(json!({}), service).outcome());
 
-        let finished = ctx.run_with_conditions(&mut outcome, FlushConditions::new().with_timeout(Duration::from_secs(5)));
-        assert!(finished, "MqttListen test timed out, msg never arrived in buffer");
+        let finished = ctx.run_with_conditions(
+            &mut outcome,
+            FlushConditions::new().with_timeout(Duration::from_secs(5)),
+        );
+        assert!(
+            finished,
+            "MqttListen test timed out, msg never arrived in buffer"
+        );
         ctx.assert_no_errors();
-        let result= outcome.try_recv().unwrap().unwrap();
+        let result = outcome.try_recv().unwrap().unwrap();
         assert_eq!(result, json!({"sensor": "temperature", "value": 42}));
     }
 
@@ -713,13 +747,11 @@ mod tests {
         }))
         .unwrap();
 
-        let service = ctx.command(|cmds| {
-            diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
-        }).expect("Diagram build failed");
+        let service = ctx
+            .command(|cmds| diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry))
+            .expect("Diagram build failed");
 
-        let mut outcome = ctx.command(|cmds| {
-            cmds.request(json!({}), service).outcome()
-        });
+        let mut outcome = ctx.command(|cmds| cmds.request(json!({}), service).outcome());
 
         ctx.run_while_pending(&mut outcome);
         ctx.assert_no_errors();

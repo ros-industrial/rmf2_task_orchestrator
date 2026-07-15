@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
+pub mod client;
 pub mod config;
 pub mod executor;
-pub mod client;
 mod node;
 
 pub use client::Clients;
