@@ -96,12 +96,12 @@ Config:
 ```
 **cel_condition use example**
 
-<img src="Images/cel_condition_example.png" width="30%" />
+<img src="images/cel_condition_example.png" width="30%" />
 
 ### consume_message
 Generic consumer node for reading JSON messages from buffers. Used in combination with `listen` operations to process buffered messages downstream.
 
 **consume_message use example**
 
-<img src="Images/consume_message_example.png" width="25%" />
+<img src="images/consume_message_example.png" width="25%" />
 

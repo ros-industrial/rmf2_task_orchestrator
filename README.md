@@ -16,9 +16,9 @@ The diagram editor is available at [http://localhost:2727/](http://localhost:272
 
 Task Orchestrator
 
-- [Interfaces (TaskRequest, TaskStatus, AMQP Consumer)](./Documentation/interfaces.md)
+- [Interfaces (TaskRequest, TaskStatus, AMQP Consumer)](./docs/interfaces.md)
 
-- [Node Types (AMQP, MQTT, Utility)](./Documentation/nodes.md)
+- [Node Types (AMQP, MQTT, Utility)](./docs/nodes.md)
 
 ### License
 
