@@ -61,7 +61,7 @@ fn parse_exchange_kind(kind: &str) -> lapin::ExchangeKind {
         "fanout" => lapin::ExchangeKind::Fanout,
         "topic" => lapin::ExchangeKind::Topic,
         "headers" => lapin::ExchangeKind::Headers,
-        other => lapin::ExchangeKind::Custom(other.to_string()),
+        _ => lapin::ExchangeKind::Custom(kind.to_string()),
     }
 }
 
@@ -419,5 +419,38 @@ impl AmqpClient {
                 )))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_exchange_kind;
+
+    #[test]
+    fn parses_standard_exchange_kinds_case_insensitively() {
+        assert!(matches!(
+            parse_exchange_kind("DiReCt"),
+            lapin::ExchangeKind::Direct
+        ));
+        assert!(matches!(
+            parse_exchange_kind("FaNoUt"),
+            lapin::ExchangeKind::Fanout
+        ));
+        assert!(matches!(
+            parse_exchange_kind("ToPiC"),
+            lapin::ExchangeKind::Topic
+        ));
+        assert!(matches!(
+            parse_exchange_kind("HeAdErS"),
+            lapin::ExchangeKind::Headers
+        ));
+    }
+
+    #[test]
+    fn preserves_custom_exchange_kind_case() {
+        assert!(matches!(
+            parse_exchange_kind("x-CustomExchange"),
+            lapin::ExchangeKind::Custom(kind) if kind == "x-CustomExchange"
+        ));
     }
 }
