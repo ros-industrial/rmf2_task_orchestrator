@@ -44,10 +44,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let clients = Clients::connect(amqp_config).await?;
 
     let http_config = &config.task_orchestrator.http;
-    let executor_url = format!("http://{}:{}", http_config.host, http_config.port);
-    let (executor_handle, editor_router) = spawn(clients, executor_url).await?;
+    let (executor_handle, editor_router) = spawn(clients, String::from(http_config)).await?;
 
-    let amqp_connection = AmqpConnection::new(&amqp_config.to_url())
+    let amqp_connection = client::AmqpConnection::new(&String::from(amqp_config))
         .await
         .map_err(|e| format!("Failed to connect to AMQP broker: {e}"))?;
 
@@ -60,12 +59,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = editor_router.route("/health_check", get(health_check));
 
-    let listener = tokio::net::TcpListener::bind((
-        config.task_orchestrator.http.host,
-        config.task_orchestrator.http.port,
-    ))
-    .await
-    .map_err(|e| format!("Failed to bind to address: {e}"))?;
+    let listener = tokio::net::TcpListener::bind(http_config.addr())
+        .await
+        .map_err(|e| format!("Failed to bind to address: {e}"))?;
 
     let local_addr = listener.local_addr()?;
     tracing::info!("Server listening on: http://{}", local_addr);
