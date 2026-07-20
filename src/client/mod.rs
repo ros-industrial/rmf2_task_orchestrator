@@ -17,31 +17,5 @@
  */
 
 mod clients;
-pub use clients::amqp::{AmqpConnection, run_consumer};
+pub use clients::amqp::{AmqpClient, AmqpConnection, AmqpRouter, run_consumer};
 pub(crate) use clients::*;
-
-use crate::config::AmqpSettings;
-use clients::amqp::AmqpClient;
-use std::sync::Arc;
-
-#[derive(Clone)]
-pub struct Clients {
-    pub(crate) amqp: Option<Arc<AmqpClient>>,
-}
-
-impl Clients {
-    pub async fn connect(amqp_config: &AmqpSettings) -> Result<Self, String> {
-        let amqp = {
-            let client = AmqpClient::connect(
-                &amqp_config.to_url(),
-                "@RECEIVE@",
-                "@RECEIVE@-task-responses",
-            )
-            .await
-            .map_err(|e| format!("Failed to connect to AMQP: {e}"))?;
-            Some(Arc::new(client))
-        };
-
-        Ok(Self { amqp })
-    }
-}
