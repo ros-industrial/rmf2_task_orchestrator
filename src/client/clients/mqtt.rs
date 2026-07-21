@@ -31,6 +31,12 @@ pub struct MqttSettings {
 
 pub type MqttMessage = Vec<u8>;
 
+#[derive(Debug, thiserror::Error)]
+pub enum MqttError {
+    #[error("Invalid QoS value error: {0}")]
+    Qos(String),
+}
+
 #[derive(Clone, bevy_ecs::resource::Resource)]
 pub struct MqttHandle {
     client: AsyncClient,
@@ -38,12 +44,13 @@ pub struct MqttHandle {
 }
 
 impl MqttHandle {
-    fn parse_qos(qos: u8) -> QoS {
-        match qos {
+    fn parse_qos(qos: u8) -> Result<QoS, MqttError> {
+        Ok(match qos {
             1 => QoS::AtLeastOnce,
             2 => QoS::ExactlyOnce,
-            _ => QoS::AtMostOnce,
-        }
+            0 => QoS::AtMostOnce,
+            _ => return Err(MqttError::Qos(format!("{qos} not between 0 and 2"))),
+        })
     }
 
     pub async fn subscribe(
@@ -57,7 +64,7 @@ impl MqttHandle {
         }
         let (tx, rx) = broadcast::channel(16);
         self.client
-            .subscribe(topic, Self::parse_qos(qos))
+            .subscribe(topic, Self::parse_qos(qos)?)
             .await
             .map_err(|e| format!("Failed to subscribe to {topic} topic: {e}"))?;
         self.subscriptions.insert(topic.to_string(), tx);
@@ -72,7 +79,7 @@ impl MqttHandle {
         retain: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.client
-            .publish(topic, Self::parse_qos(qos), retain, payload)
+            .publish(topic, Self::parse_qos(qos)?, retain, payload)
             .await
             .map_err(|e| format!("Failed to publish to {topic} topic: {e}"))?;
         Ok(())
