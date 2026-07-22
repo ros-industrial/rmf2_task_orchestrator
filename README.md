@@ -4,11 +4,21 @@
 
 ### Getting Started
 
+**Prerequisites:** MQTT broker (eg. [Mosquitto](https://mosquitto.org/)) and [RabbitMQ](https://www.rabbitmq.com/) running locally.
+
 ```bash
 cargo run
 ```
 
 The diagram editor is available at [http://localhost:2727/](http://localhost:2727/)
+
+**Run an example workflow:**
+
+```bash
+curl -X POST http://localhost:2727/api/executor/run \
+  -H "Content-Type: application/json" \
+  -d "{\"diagram\": $(cat diagrams/mqtt_examples/mqtt_listen_consume.json), \"request\": {}}"
+```
 
 ### Documentation
 
