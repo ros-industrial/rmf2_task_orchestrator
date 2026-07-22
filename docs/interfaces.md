@@ -50,7 +50,7 @@ The orchestrator consumes messages from the AMQP `@RECEIVE@` exchange (queue: `@
         "ops": {
             "node_1": {
                 "type": "node",
-                "builder": "MQTTDeviceReqNode",
+                "builder": "MqttDeviceReqNode",
                 "config": {
                     "asset_id": "MANIP1",
                     "task_id": "Depalletize001",
@@ -61,7 +61,7 @@ The orchestrator consumes messages from the AMQP `@RECEIVE@` exchange (queue: `@
             },
             "node_2": {
                 "type": "node",
-                "builder": "MQTTDeviceReqNode",
+                "builder": "MqttDeviceReqNode",
                 "config": {
                     "asset_id": "SNS1",
                     "task_id": "Store001",
