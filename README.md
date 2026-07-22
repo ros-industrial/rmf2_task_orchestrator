@@ -10,8 +10,6 @@
 cargo run
 ```
 
-The diagram editor is available at [http://localhost:2727/](http://localhost:2727/)
-
 **Run an example workflow:**
 
 ```bash
@@ -19,6 +17,11 @@ curl -X POST http://localhost:2727/api/executor/run \
   -H 'Content-Type: application/json' \
   -d '{"diagram": '"$(cat diagrams/mqtt_examples/mqtt_listen_consume.json)"', "request": {}}'
 ```
+
+Alternatively, the workflow can be ran on the [live editor](http://localhost:2727)
+
+![Diagram Editor](docs/images/diagram_editor_example.png)
+
 
 ### Documentation
 
