@@ -16,8 +16,8 @@ The diagram editor is available at [http://localhost:2727/](http://localhost:272
 
 ```bash
 curl -X POST http://localhost:2727/api/executor/run \
-  -H "Content-Type: application/json" \
-  -d "{\"diagram\": $(cat diagrams/mqtt_examples/mqtt_listen_consume.json), \"request\": {}}"
+  -H 'Content-Type: application/json' \
+  -d '{"diagram": '"$(cat diagrams/mqtt_examples/mqtt_listen_consume.json)"', "request": {}}'
 ```
 
 ### Documentation
