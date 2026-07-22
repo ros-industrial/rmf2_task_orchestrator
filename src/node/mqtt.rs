@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use crate::client::mqtt::MqttHandle;
+use crate::client::mqtt::{MqttHandle, MqttSettings};
 use crate::node::utils::{
     CelConditionEvalConfig, ConsumeMessageKey, MessageStream, consume_message, eval_condition_node,
 };
@@ -490,8 +490,14 @@ mod tests {
     use std::time::Duration;
 
     fn register_nodes(app: &mut App, registry: &mut DiagramElementRegistry) {
-        let mqtt_handle = MqttHandle::connect("test-client", "localhost", 1883)
-            .expect("Mosquitto must be running for MQTT setup");
+        let mqtt_handle = MqttHandle::connect(
+            "test-client",
+            MqttSettings {
+                host: String::from("localhost"),
+                port: 1883,
+            },
+        );
+        // .expect("Mosquitto must be running for MQTT setup");
         crate::node::mqtt::register(app, registry, Arc::new(mqtt_handle));
         crate::node::utils::register(registry);
     }

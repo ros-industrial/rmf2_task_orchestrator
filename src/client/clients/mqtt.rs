@@ -87,11 +87,11 @@ impl MqttHandle {
 }
 
 impl MqttHandle {
-    pub fn connect(
-        client_id: &str,
-        host: &str,
-        port: u16,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    // TODO(@EthanKuai): Max retries timeout + change implementations to expect result.
+    pub fn connect(client_id: &str, config: MqttSettings) -> Self {
+        let host: &str = &config.host;
+        let port: u16 = config.port;
+
         let mut mqttoptions = MqttOptions::new(client_id, host, port);
         mqttoptions.set_keep_alive(Duration::from_secs(5));
         tracing::info!(
@@ -127,10 +127,10 @@ impl MqttHandle {
                 }
             }
         });
-        Ok(Self {
+        Self {
             client,
             subscriptions,
-        })
+        }
     }
 }
 
