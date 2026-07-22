@@ -3,6 +3,18 @@
 ## Task Request
 Publishes a task request to instruct an asset to perform a specific task. The message includes the task type, command, task parameters, and expected time window.
 
+| Field | Type | Description |
+|-------|------|-------------|
+| type | string | Message type. Always `"TaskRequest"` |
+| id | string | Unique task identifier (URN format) |
+| task_type | string | Type of task to perform (eg. `"Depalletize"`, `"Store"`) |
+| task_command | string | Command to execute (eg. `"START"`, `"STOP"`, `"CANCEL"`) |
+| asset_id | string | Target asset/device identifier |
+| task_params | object | Task-specific parameters |
+| timestamp | string | ISO 8601 timestamp of the request |
+| task_expected_start | string | Expected start time |
+| task_expected_end | string | Expected end time |
+
 Payload:
 ```json
 {
@@ -22,6 +34,17 @@ Payload:
 
 ## Task Status
 Assets publish task status messages to report the outcome or progress of a requested task.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| id | string | Task identifier matching the original TaskRequest |
+| task_type | string | Type of task |
+| status | string | Current status (`"RUNNING"`, `"COMPLETED"`, `"FAILED"`) |
+| asset_id | string | Asset reporting the status |
+| task_params | object | Task-specific parameters |
+| timestamp | string | ISO 8601 timestamp of the status update |
+| task_expected_start | string | Expected start time |
+| task_expected_end | string | Expected end time |
 
 Payload:
 ```json
