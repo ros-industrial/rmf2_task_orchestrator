@@ -1,0 +1,35 @@
+services:
+  task-orchestrator:
+    build: .
+    ports:
+      - "${HTTP_PORT:-2727}:2727"
+    environment:
+      - TASK_ORCHESTRATOR__HTTP__HOST=0.0.0.0
+      - TASK_ORCHESTRATOR__AMQP__HOST=${AMQP_HOST:-rabbitmq}
+      - TASK_ORCHESTRATOR__AMQP__PORT=${AMQP_PORT:-5672}
+      - TASK_ORCHESTRATOR__MQTT__HOST=${MQTT_HOST:-mosquitto}
+      - TASK_ORCHESTRATOR__MQTT__PORT=${MQTT_PORT:-1883}
+      - RUST_LOG=${LOG_LEVEL:-rmf2_task_orchestrator=info}
+    restart: unless-stopped
+
+  rabbitmq:
+    profiles: [local]
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  mosquitto:
+    profiles: [local]
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    configs:
+      - source: mosquitto-config
+        target: /mosquitto/config/mosquitto.conf
+
+configs:
+  mosquitto-config:
+    content: |
+      listener 1883
+      allow_anonymous true
