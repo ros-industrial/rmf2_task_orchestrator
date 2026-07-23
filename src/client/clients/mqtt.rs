@@ -155,19 +155,26 @@ pub struct MqttTomlFormat {
 }
 
 #[derive(Clone)]
-struct EnsureMqtt(Arc<Mutex<Option<MqttSettings>>>);
+pub(crate) struct EnsureMqtt(Arc<Mutex<Option<MqttSettings>>>);
 
 impl EnsureMqtt {
-    fn new(config: Option<MqttSettings>) -> Self {
-        Self(Arc::new(Mutex::new(Some(match config {
-            Some(c) => c,
-            None => Self::load_config(),
-        }))))
+    pub(crate) fn new(config: Option<MqttSettings>) -> Self {
+        Self(Arc::new(Mutex::new(config.or_else(Self::load_config))))
     }
 
-    fn load_config() -> MqttSettings {
+    // TODO(@EthanKuai): This silently suppresses invalid Mqtt config into never launching MqttClient
+    fn load_config() -> Option<MqttSettings> {
         crate::config::load_base_configuration::<MqttTomlFormat>()
-            .unwrap()
-            .mqtt_client
+            .ok()
+            .map(|c| c.mqtt_client)
+    }
+}
+
+impl bevy_ecs::system::Command for EnsureMqtt {
+    fn apply(self, world: &mut bevy_ecs::prelude::World) {
+        if let Some(mqtt_config) = self.0.lock().unwrap().take() {
+            let mqtt = MqttHandle::connect(mqtt_config);
+            world.insert_resource(mqtt);
+        }
     }
 }
