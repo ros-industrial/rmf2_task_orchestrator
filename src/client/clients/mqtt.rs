@@ -41,6 +41,10 @@ pub type MqttMessage = Vec<u8>;
 pub enum MqttError {
     #[error("Invalid QoS value error: {0}")]
     Qos(String),
+    #[error("Subscribing error: {0}")]
+    Subscribe(String),
+    #[error("Publishing error: {0}")]
+    Publish(String),
 }
 
 #[derive(Clone, bevy_ecs::resource::Resource)]
@@ -63,7 +67,7 @@ impl MqttHandle {
         &self,
         topic: &str,
         qos: u8,
-    ) -> Result<broadcast::Receiver<MqttMessage>, Box<dyn std::error::Error>> {
+    ) -> Result<broadcast::Receiver<MqttMessage>, MqttError> {
         // Clones the tx channel to pass to node if the topic currently has a rx channel opened
         if let Some(tx) = self.subscriptions.get(topic) {
             return Ok(tx.subscribe());
@@ -72,7 +76,9 @@ impl MqttHandle {
         self.client
             .subscribe(topic, Self::parse_qos(qos)?)
             .await
-            .map_err(|e| format!("Failed to subscribe to {topic} topic: {e}"))?;
+            .map_err(|e| {
+                MqttError::Subscribe(format!("Failed to subscribe to {topic} topic: {e}"))
+            })?;
         self.subscriptions.insert(topic.to_string(), tx);
         Ok(rx)
     }
@@ -83,11 +89,11 @@ impl MqttHandle {
         payload: impl Into<Vec<u8>>,
         qos: u8,
         retain: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), MqttError> {
         self.client
             .publish(topic, Self::parse_qos(qos)?, retain, payload)
             .await
-            .map_err(|e| format!("Failed to publish to {topic} topic: {e}"))?;
+            .map_err(|e| MqttError::Publish(format!("Failed to publish to {topic} topic: {e}")))?;
         Ok(())
     }
 }
