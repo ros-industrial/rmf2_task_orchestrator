@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use crate::config::ConsumerSettings;
+use crate::config::{AmqpSettings, ConsumerSettings};
 use futures_lite::StreamExt;
 use lapin::{Channel, Connection, ConnectionProperties, Consumer, options::*, types::FieldTable};
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
@@ -43,7 +43,8 @@ pub struct AmqpConnection {
 }
 
 impl AmqpConnection {
-    pub async fn new(uri: &str) -> Result<Self, AmqpError> {
+    pub async fn new(amqp_config: &AmqpSettings) -> Result<Self, AmqpError> {
+        let uri: &str = &String::from(amqp_config);
         let connection = Connection::connect(uri, ConnectionProperties::default())
             .await
             .map_err(|e| AmqpError::Connection(e.to_string()))?;

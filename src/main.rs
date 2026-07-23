@@ -17,9 +17,9 @@
  */
 
 use axum::{http::StatusCode, routing::get};
-use rmf2_task_orchestrator::client::{AmqpConnection, run_consumer};
-use rmf2_task_orchestrator::config::load_base_configuration;
-use rmf2_task_orchestrator::{Clients, create_amqp_router, spawn};
+use rmf2_task_orchestrator::client;
+use rmf2_task_orchestrator::config::{Settings, load_base_configuration};
+use rmf2_task_orchestrator::{create_amqp_router, spawn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 async fn health_check() -> StatusCode {
@@ -36,24 +36,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let config =
+    let config: Settings =
         load_base_configuration().map_err(|e| format!("Error loading config file: {e}"))?;
 
     let amqp_config = &config.task_orchestrator.amqp;
-    let mqtt_config = &config.task_orchestrator.mqtt;
-
-    let clients = Clients::connect(amqp_config, mqtt_config).await?;
-
+    let mqtt_config = None;
     let http_config = &config.task_orchestrator.http;
-    let executor_url = format!("http://{}:{}", http_config.host, http_config.port);
-    let (executor_handle, editor_router) = spawn(clients, executor_url).await?;
 
-    let amqp_connection = AmqpConnection::new(&amqp_config.to_url())
+    let (executor_handle, editor_router) = spawn(amqp_config, mqtt_config, http_config).await?;
+
+    let amqp_connection = client::AmqpConnection::new(amqp_config)
         .await
         .map_err(|e| format!("Failed to connect to AMQP broker: {e}"))?;
 
     let amqp_router = create_amqp_router(executor_handle);
-    tokio::spawn(run_consumer(
+    tokio::spawn(client::run_consumer(
         amqp_connection,
         amqp_config.consumer.clone(),
         amqp_router,
@@ -61,12 +58,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = editor_router.route("/health_check", get(health_check));
 
-    let listener = tokio::net::TcpListener::bind((
-        config.task_orchestrator.http.host,
-        config.task_orchestrator.http.port,
-    ))
-    .await
-    .map_err(|e| format!("Failed to bind to address: {e}"))?;
+    let listener = tokio::net::TcpListener::bind(http_config.addr())
+        .await
+        .map_err(|e| format!("Failed to bind to address: {e}"))?;
 
     let local_addr = listener.local_addr()?;
     tracing::info!("Server listening on: http://{}", local_addr);

@@ -16,17 +16,17 @@
  * limitations under the License.
  */
 
-use crate::client::mqtt::MqttHandle;
+use crate::client::mqtt::{EnsureMqtt, MqttHandle, MqttSettings};
 use crate::node::utils::{
     CelConditionEvalConfig, ConsumeMessageKey, MessageStream, consume_message, eval_condition_node,
 };
 
 use crossflow::ConfigExample;
-use crossflow::bevy_ecs::prelude::Res;
+use crossflow::bevy_app;
+use crossflow::bevy_ecs;
 use crossflow::prelude::*;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, Error)]
@@ -37,12 +37,14 @@ pub enum MqttNodeError {
     Publish(String),
     #[error("Parse failed: {0}")]
     Parse(String),
+    #[error("Serialise failed: {0}")]
+    Serialise(String),
     #[error("Timeout on {topic}")]
     Timeout { topic: String },
-    #[error("Condition error: {0}")]
-    Condition(String),
-    #[error("Unknown error")]
-    Unknown,
+    #[error("Channel failed: {0}")]
+    Channel(String),
+    #[error("Unknown error: {0}")]
+    Unknown(String),
 }
 
 fn default_timeout() -> f32 {
@@ -60,22 +62,21 @@ struct MqttPublishConfig {
 }
 
 pub(crate) fn register(
-    app: &mut crossflow::bevy_app::App,
+    app: &mut bevy_app::App,
     registry: &mut DiagramElementRegistry,
-    mqtt_handle: Arc<MqttHandle>,
+    mqtt_config: Option<MqttSettings>,
 ) {
-    app.insert_resource(mqtt_handle.as_ref().clone());
-    let timer_service = app.spawn_continuous_service(
-        crossflow::bevy_app::Update,
-        crate::node::utils::timer_countdown,
-    );
-    register_mqtt_publish_node(registry);
-    register_mqtt_subscribe_node(registry, timer_service);
-    register_mqtt_listen_node(registry);
-    register_mqtt_device_req_node(registry, mqtt_handle);
+    let ensure_mqtt = EnsureMqtt::new(mqtt_config);
+    let timer_service =
+        app.spawn_continuous_service(bevy_app::Update, crate::node::utils::timer_countdown);
+
+    register_mqtt_publish_node(registry, ensure_mqtt.clone());
+    register_mqtt_subscribe_node(registry, ensure_mqtt.clone(), timer_service);
+    register_mqtt_listen_node(registry, ensure_mqtt.clone());
+    register_mqtt_device_req_node(registry, ensure_mqtt);
 }
 
-fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry) {
+fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry, ensure_mqtt: EnsureMqtt) {
     registry
         .register_node_builder(
             NodeBuilderOptions::new("mqtt_publish")
@@ -97,8 +98,8 @@ fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry) {
                         }
                     )
                 ]),
-            |builder, config: MqttPublishConfig| {
-                mqtt_publish_node(builder, config)
+            move |builder, config: MqttPublishConfig| {
+                mqtt_publish_node(builder, config, ensure_mqtt.clone())
             },
         )
         .with_result();
@@ -107,6 +108,7 @@ fn register_mqtt_publish_node(registry: &mut DiagramElementRegistry) {
 fn mqtt_publish_node(
     builder: &mut Builder,
     config: MqttPublishConfig,
+    ensure_mqtt: EnsureMqtt,
 ) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
     let MqttPublishConfig {
         topic,
@@ -114,8 +116,10 @@ fn mqtt_publish_node(
         qos,
         retain,
     } = config;
+    builder.commands().queue(ensure_mqtt);
+
     let callback = move |Async { request, .. }: Async<JsonMessage>,
-                         mqtt_handle: Res<MqttHandle>| {
+                         mqtt_handle: bevy_ecs::prelude::Res<MqttHandle>| {
         let topic = topic.clone();
         let payload = payload.clone();
         let mqtt = mqtt_handle.clone();
@@ -156,6 +160,7 @@ fn default_qos() -> u8 {
 
 fn register_mqtt_subscribe_node(
     registry: &mut DiagramElementRegistry,
+    ensure_mqtt: EnsureMqtt,
     timer_service: Service<((), BufferKey<f32>), ()>,
 ) {
     registry
@@ -178,7 +183,7 @@ fn register_mqtt_subscribe_node(
                         "Wait for task completion or failure",
                         MqttSubscribeAndWaitConfig {
                             topic: "asset/ManipulatorRobot1/task_status".into(),
-                            condition: "message.status == 'COMPLETED' || message.status == 
+                            condition: "message.status == 'COMPLETED' || message.status ==
   'FAILED'"
                                 .into(),
                             timeout_secs: 300.0,
@@ -187,7 +192,7 @@ fn register_mqtt_subscribe_node(
                     ),
                 ]),
             move |builder, config: MqttSubscribeAndWaitConfig| {
-                mqtt_subscribe_node(builder, config, timer_service)
+                mqtt_subscribe_node(builder, config, ensure_mqtt.clone(), timer_service)
             },
         )
         .with_result();
@@ -196,6 +201,7 @@ fn register_mqtt_subscribe_node(
 fn mqtt_subscribe_node(
     builder: &mut Builder,
     config: MqttSubscribeAndWaitConfig,
+    ensure_mqtt: EnsureMqtt,
     timer_service: Service<((), BufferKey<f32>), ()>,
 ) -> Node<JsonMessage, Result<JsonMessage, MqttNodeError>> {
     let MqttSubscribeAndWaitConfig {
@@ -204,11 +210,12 @@ fn mqtt_subscribe_node(
         timeout_secs,
         qos,
     } = config;
+
     let mqtt_topic = topic.clone();
     // Timeout is achieved by racing the mqtt sub loop with the timeout service using a fork clone. If a message
     // is not received during the timeout duration, returns a timeout error.
-    builder.create_io_scope(|scope, builder| {
-        let sub_loop = mqtt_listen_node(builder, MqttListenConfig { topic, qos });
+    builder.create_io_scope(move |scope, builder| {
+        let sub_loop = mqtt_listen_node(builder, MqttListenConfig { topic, qos }, ensure_mqtt);
         let msg_buffer: Buffer<JsonMessage> = builder.create_buffer(BufferSettings::default());
         let cel_node = eval_condition_node(
             builder,
@@ -266,7 +273,7 @@ struct MqttListenConfig {
     pub qos: u8,
 }
 
-fn register_mqtt_listen_node(registry: &mut DiagramElementRegistry) {
+fn register_mqtt_listen_node(registry: &mut DiagramElementRegistry, ensure_mqtt: EnsureMqtt) {
     registry
         .register_node_builder(
             NodeBuilderOptions::new("mqtt_listen")
@@ -281,8 +288,8 @@ fn register_mqtt_listen_node(registry: &mut DiagramElementRegistry) {
                         },
                     ),
                 ]),
-            |builder, config: MqttListenConfig| {
-                mqtt_listen_node(builder, config)
+            move |builder, config: MqttListenConfig| {
+                mqtt_listen_node(builder, config, ensure_mqtt.clone())
             },
         )
         .with_result();
@@ -291,10 +298,13 @@ fn register_mqtt_listen_node(registry: &mut DiagramElementRegistry) {
 fn mqtt_listen_node(
     builder: &mut Builder,
     config: MqttListenConfig,
+    ensure_mqtt: EnsureMqtt,
 ) -> Node<JsonMessage, Result<(), MqttNodeError>, MessageStream> {
     let MqttListenConfig { topic, qos } = config;
+    builder.commands().queue(ensure_mqtt);
+
     let callback = move |Async { streams, .. }: Async<JsonMessage, MessageStream>,
-                         mqtt_handle: Res<MqttHandle>| {
+                         mqtt_handle: bevy_ecs::prelude::Res<MqttHandle>| {
         let topic = topic.clone();
         let mqtt = mqtt_handle.clone();
         async move {
@@ -352,147 +362,154 @@ struct DeviceTaskResponse {
     error: String,
 }
 
-fn register_mqtt_device_req_node(
-    registry: &mut DiagramElementRegistry,
-    mqtt_client: Arc<MqttHandle>,
-) {
+fn register_mqtt_device_req_node(registry: &mut DiagramElementRegistry, ensure_mqtt: EnsureMqtt) {
     registry.register_node_builder(
         NodeBuilderOptions::new("MqttDeviceReqNode").with_default_display_text("MQTT Device Req"),
         move |builder, config: MqttDeviceReqConfig| {
-            let mqtt_client = mqtt_client.clone();
-            let config = config.clone();
-
-            builder.create_map_async(move |_workflow_context: serde_json::Value| {
-                let mqtt_client = mqtt_client.clone();
-                let config = config.clone();
-                async move {
-                    tracing::debug!(
-                        "MqttDeviceReqNode: asset_id={}, task_type={}",
-                        config.asset_id,
-                        config.task_type,
-                    );
-
-                    let status_topic = format!("asset/{}/asset_status", &config.asset_id);
-                    let request_topic = format!("asset/{}/task_request", &config.asset_id);
-                    let response_topic = format!("asset/{}/task_status", &config.asset_id);
-
-                    let mut status_rx = mqtt_client
-                        .subscribe(&status_topic, 0)
-                        .await
-                        .map_err(|e| format!("Failed to subscribe to {}: {e}", status_topic))?;
-
-                    let mut response_rx = mqtt_client
-                        .subscribe(&response_topic, 0)
-                        .await
-                        .map_err(|e| format!("Failed to subscribe to {}: {e}", response_topic))?;
-
-                    loop {
-                        let msg = match status_rx.recv().await {
-                            Ok(msg) => msg,
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                                tracing::warn!("MqttDeviceReqNode: status lagged {n} messages");
-                                continue;
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                                return Err("Status channel closed".into());
-                            }
-                        };
-                        match serde_json::from_slice::<DeviceStatusUpdate>(&msg) {
-                            Ok(update) => {
-                                if update.state == "IDLE" {
-                                    break;
-                                }
-                                tracing::debug!(
-                                    "MqttDeviceReqNode: waiting for {} to be IDLE (state={})",
-                                    config.asset_id,
-                                    update.state
-                                );
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    "MqttDeviceReqNode: failed to parse status update: {e}"
-                                );
-                            }
-                        }
-                    }
-
-                    let request_payload = serde_json::json!({
-                        "asset_id": &config.asset_id,
-                        "task_type": &config.task_type,
-                        "task_params": &config.task_params,
-                    });
-
-                    let payload = serde_json::to_vec(&request_payload)
-                        .map_err(|e| format!("Failed to serialize task request: {e}"))?;
-
-                    mqtt_client
-                        .publish(&request_topic, payload, 0, false)
-                        .await
-                        .map_err(|e| format!("Failed to publish to {}: {e}", request_topic))?;
-
-                    tracing::debug!(
-                        "MqttDeviceReqNode: published to {}, waiting for response on {}",
-                        request_topic,
-                        response_topic
-                    );
-
-                    loop {
-                        let msg = match response_rx.recv().await {
-                            Ok(msg) => msg,
-                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                                tracing::warn!("MqttDeviceReqNode: response lagged {n} messages");
-                                continue;
-                            }
-                            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                                return Err("Response channel closed".into());
-                            }
-                        };
-                        match serde_json::from_slice::<DeviceTaskResponse>(&msg) {
-                            Ok(update) => {
-                                tracing::debug!(
-                                    "MqttDeviceReqNode: task response for {}: status={}",
-                                    config.asset_id,
-                                    update.status
-                                );
-                                if update.status == "COMPLETED" {
-                                    break;
-                                } else if update.status == "FAILED" {
-                                    return Err(format!(
-                                        "MqttDeviceReqNode: failed for {}: {}",
-                                        config.asset_id, update.error
-                                    ));
-                                }
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    "MqttDeviceReqNode: failed to parse task response: {e}"
-                                );
-                            }
-                        }
-                    }
-
-                    tracing::debug!("MqttDeviceReqNode: completed for {}", config.asset_id);
-                    Ok::<_, String>(serde_json::json!({"status": "ok"}))
-                }
-            })
+            mqtt_device_req_node(builder, config, ensure_mqtt.clone())
         },
     );
+}
+
+fn mqtt_device_req_node(
+    builder: &mut Builder,
+    config: MqttDeviceReqConfig,
+    ensure_mqtt: EnsureMqtt,
+) -> Node<serde_json::Value, Result<serde_json::Value, MqttNodeError>> {
+    builder.commands().queue(ensure_mqtt);
+
+    let callback = move |Async {
+                             request: _workflow_context,
+                             ..
+                         }: Async<serde_json::Value>,
+                         mqtt_handle: bevy_ecs::prelude::Res<MqttHandle>| {
+        // let ensure_mqtt = ensure_mqtt.clone();
+        let config = config.clone();
+        let mqtt = mqtt_handle.clone();
+        async move {
+            tracing::debug!(
+                "MqttDeviceReqNode: asset_id={}, task_type={}",
+                config.asset_id,
+                config.task_type,
+            );
+
+            let status_topic = format!("asset/{}/asset_status", &config.asset_id);
+            let request_topic = format!("asset/{}/task_request", &config.asset_id);
+            let response_topic = format!("asset/{}/task_status", &config.asset_id);
+
+            let mut status_rx = mqtt
+                .subscribe(&status_topic, 0)
+                .await
+                .map_err(|e| MqttNodeError::Subscribe(e.to_string()))?;
+
+            let mut response_rx = mqtt
+                .subscribe(&response_topic, 0)
+                .await
+                .map_err(|e| MqttNodeError::Subscribe(e.to_string()))?;
+
+            loop {
+                let msg = match status_rx.recv().await {
+                    Ok(msg) => msg,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("MqttDeviceReqNode: status lagged {n} messages");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        return Err(MqttNodeError::Channel("Status channel closed".into()));
+                    }
+                };
+                match serde_json::from_slice::<DeviceStatusUpdate>(&msg) {
+                    Ok(update) => {
+                        if update.state == "IDLE" {
+                            break;
+                        }
+                        tracing::debug!(
+                            "MqttDeviceReqNode: waiting for {} to be IDLE (state={})",
+                            config.asset_id,
+                            update.state
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("MqttDeviceReqNode: failed to parse status update: {e}");
+                    }
+                }
+            }
+
+            let request_payload = serde_json::json!({
+                "asset_id": &config.asset_id,
+                "task_type": &config.task_type,
+                "task_params": &config.task_params,
+            });
+
+            let payload = serde_json::to_vec(&request_payload)
+                .map_err(|e| MqttNodeError::Serialise(e.to_string()))?;
+
+            mqtt.publish(&request_topic, payload, 0, false)
+                .await
+                .map_err(|e| MqttNodeError::Publish(e.to_string()))?;
+
+            tracing::debug!(
+                "MqttDeviceReqNode: published to {}, waiting for response on {}",
+                request_topic,
+                response_topic
+            );
+
+            loop {
+                let msg = match response_rx.recv().await {
+                    Ok(msg) => msg,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("MqttDeviceReqNode: response lagged {n} messages");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        return Err(MqttNodeError::Channel("Response channel closed".into()));
+                    }
+                };
+                match serde_json::from_slice::<DeviceTaskResponse>(&msg) {
+                    Ok(update) => {
+                        tracing::debug!(
+                            "MqttDeviceReqNode: task response for {}: status={}",
+                            config.asset_id,
+                            update.status
+                        );
+                        if update.status == "COMPLETED" {
+                            break;
+                        } else if update.status == "FAILED" {
+                            return Err(MqttNodeError::Unknown(format!(
+                                "MqttDeviceReqNode: failed for {}: {}",
+                                config.asset_id, update.error
+                            )));
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("MqttDeviceReqNode: failed to parse task response: {e}");
+                    }
+                }
+            }
+
+            tracing::debug!("MqttDeviceReqNode: completed for {}", config.asset_id);
+            Ok(serde_json::json!({"status": "ok"}))
+        }
+    };
+    builder.create_node(callback.into_callback())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::mqtt::MqttHandle;
+    use crate::client::mqtt::MqttSettings;
     use crossflow::bevy_app::App;
     use crossflow::{Diagram, DiagramElementRegistry, testing::*};
     use serde_json::json;
-    use std::sync::Arc;
     use std::time::Duration;
 
     fn register_nodes(app: &mut App, registry: &mut DiagramElementRegistry) {
-        let mqtt_handle = MqttHandle::connect("test-client", "localhost", 1883)
-            .expect("Mosquitto must be running for MQTT setup");
-        crate::node::mqtt::register(app, registry, Arc::new(mqtt_handle));
+        let mqtt_config = Some(MqttSettings {
+            client_id: String::from("test-client"),
+            ..Default::default()
+        });
+        // .expect("Mosquitto must be running for MQTT setup");
+        crate::node::mqtt::register(app, registry, mqtt_config);
         crate::node::utils::register(registry);
     }
 

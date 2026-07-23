@@ -21,5 +21,4 @@ pub mod config;
 pub mod executor;
 mod node;
 
-pub use client::Clients;
-pub use executor::{ExecutorHandle, create_amqp_router, spawn};
+pub use executor::{ExecutorHandle, create_amqp_client, create_amqp_router, spawn};

@@ -37,9 +37,9 @@ fn default_exchange_kind() -> String {
     "topic".to_string()
 }
 
-impl AmqpSettings {
-    pub fn to_url(&self) -> String {
-        format!("amqp://{}:{}", self.host, self.port)
+impl From<&AmqpSettings> for String {
+    fn from(config: &AmqpSettings) -> String {
+        format!("amqp://{}:{}", config.host, config.port)
     }
 }
 
@@ -47,7 +47,6 @@ impl AmqpSettings {
 pub struct TaskOrchestratorSettings {
     pub http: HttpSettings,
     pub amqp: AmqpSettings,
-    pub mqtt: MqttSettings,
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -56,10 +55,16 @@ pub struct HttpSettings {
     pub host: String,
 }
 
-#[derive(serde::Deserialize, Clone)]
-pub struct MqttSettings {
-    pub port: u16,
-    pub host: String,
+impl From<&HttpSettings> for String {
+    fn from(config: &HttpSettings) -> String {
+        format!("http://{}:{}", config.host, config.port)
+    }
+}
+
+impl HttpSettings {
+    pub fn addr(&self) -> (String, u16) {
+        (self.host.clone(), self.port)
+    }
 }
 
 #[derive(serde::Deserialize, Clone)]
@@ -93,7 +98,10 @@ impl Environment {
     }
 }
 
-pub fn load_base_configuration() -> Result<Settings, config::ConfigError> {
+pub fn load_base_configuration<T>() -> Result<T, config::ConfigError>
+where
+    T: serde::de::DeserializeOwned,
+{
     let mut builder = config::Config::builder()
         .add_source(config::File::new("config.toml", config::FileFormat::Toml));
     let env = Environment::from_env();
@@ -114,5 +122,5 @@ pub fn load_base_configuration() -> Result<Settings, config::ConfigError> {
     dotenvy::from_filename(env_file).ok();
     builder = builder.add_source(config::Environment::default().separator("__"));
 
-    builder.build()?.try_deserialize::<Settings>()
+    builder.build()?.try_deserialize::<T>()
 }
