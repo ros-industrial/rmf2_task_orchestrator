@@ -17,10 +17,9 @@
  */
 
 use axum::{http::StatusCode, routing::get};
-use crossflow::bevy_ecs;
 use rmf2_task_orchestrator::client;
 use rmf2_task_orchestrator::config::{Settings, load_base_configuration};
-use rmf2_task_orchestrator::{create_amqp_client, create_amqp_router, spawn};
+use rmf2_task_orchestrator::{create_amqp_router, spawn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 async fn health_check() -> StatusCode {
@@ -41,13 +40,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         load_base_configuration().map_err(|e| format!("Error loading config file: {e}"))?;
 
     let amqp_config = &config.task_orchestrator.amqp;
-    let amqp_client = create_amqp_client(amqp_config).await?;
-
+    let mqtt_config = None;
     let http_config = &config.task_orchestrator.http;
-    let (executor_handle, editor_router) =
-        spawn(amqp_client.clone(), String::from(http_config)).await?;
 
-    let amqp_connection = client::AmqpConnection::new(&String::from(amqp_config))
+    let (executor_handle, editor_router) = spawn(amqp_config, mqtt_config, http_config).await?;
+
+    let amqp_connection = client::AmqpConnection::new(amqp_config)
         .await
         .map_err(|e| format!("Failed to connect to AMQP broker: {e}"))?;
 

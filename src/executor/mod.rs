@@ -18,8 +18,9 @@
 
 mod amqp_handlers;
 
+use crate::client::mqtt::MqttSettings;
 use crate::client::{AmqpClient, AmqpRouter};
-use crate::config::AmqpSettings;
+use crate::config::{AmqpSettings, HttpSettings};
 use crate::node;
 use amqp_handlers::handle_workflow_execute;
 
@@ -38,9 +39,11 @@ pub struct ExecutorHandle {
 
 // Spawn the Bevy executor in a separate thread
 pub async fn spawn(
-    amqp_client: Arc<AmqpClient>,
-    executor_url: String,
+    amqp_config: &AmqpSettings,
+    mqtt_config: Option<MqttSettings>,
+    http_config: &HttpSettings,
 ) -> Result<(ExecutorHandle, Router), String> {
+    let amqp_client = create_amqp_client(amqp_config).await?;
     let (router_tx, router_rx) = oneshot::channel();
 
     thread::spawn(move || {
@@ -62,6 +65,7 @@ pub async fn spawn(
         .await
         .map_err(|_| "Failed to spawn executor, channel closed".to_string())?;
 
+    let executor_url = String::from(http_config);
     let handle = ExecutorHandle { executor_url };
 
     Ok((handle, diagram_editor_router))
