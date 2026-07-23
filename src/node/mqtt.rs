@@ -506,8 +506,7 @@ mod tests {
     fn register_nodes(app: &mut App, registry: &mut DiagramElementRegistry) {
         let mqtt_config = Some(MqttSettings {
             client_id: String::from("test-client"),
-            host: String::from("localhost"),
-            port: 1883,
+            ..Default::default()
         });
         // .expect("Mosquitto must be running for MQTT setup");
         crate::node::mqtt::register(app, registry, mqtt_config);

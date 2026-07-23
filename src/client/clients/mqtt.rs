@@ -24,15 +24,23 @@ use std::time::Duration;
 use tokio::sync::broadcast;
 
 #[derive(serde::Deserialize, Clone)]
+#[serde(default)]
 pub struct MqttSettings {
-    #[serde(default = "default_client_id")]
     pub client_id: String,
     pub host: String,
     pub port: u16,
+    pub reconnect_millis: u64,
 }
 
-fn default_client_id() -> String {
-    "TaskOrchestrator-MQTT".to_string()
+impl Default for MqttSettings {
+    fn default() -> Self {
+        Self {
+            client_id: String::from("TaskOrchestrator-MQTT"),
+            host: String::from("localhost"),
+            port: 1883,
+            reconnect_millis: 250,
+        }
+    }
 }
 
 pub type MqttMessage = Vec<u8>;
@@ -105,6 +113,7 @@ impl MqttHandle {
             client_id,
             host,
             port,
+            reconnect_millis,
         } = config;
 
         let mut mqttoptions = MqttOptions::new(&client_id, &host, port);
@@ -138,6 +147,7 @@ impl MqttHandle {
                     Ok(_) => {}
                     Err(e) => {
                         tracing::warn!("MQTT connection error, reconnecting... {e}");
+                        tokio::time::sleep(Duration::from_millis(reconnect_millis)).await;
                     }
                 }
             }
@@ -162,7 +172,6 @@ impl EnsureMqtt {
         Self(Arc::new(Mutex::new(config.or_else(Self::load_config))))
     }
 
-    // TODO(@EthanKuai): This silently suppresses invalid Mqtt config into never launching MqttClient
     fn load_config() -> Option<MqttSettings> {
         crate::config::load_base_configuration::<MqttTomlFormat>()
             .ok()
