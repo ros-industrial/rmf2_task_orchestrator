@@ -25,8 +25,14 @@ use tokio::sync::broadcast;
 
 #[derive(serde::Deserialize, Clone)]
 pub struct MqttSettings {
+    #[serde(default = "default_client_id")]
+    pub client_id: String,
     pub host: String,
     pub port: u16,
+}
+
+fn default_client_id() -> String {
+    "TaskOrchestrator-MQTT".to_string()
 }
 
 pub type MqttMessage = Vec<u8>;
@@ -39,7 +45,7 @@ pub enum MqttError {
 
 #[derive(Clone, bevy_ecs::resource::Resource)]
 pub struct MqttHandle {
-    client: AsyncClient,
+    client: Arc<AsyncClient>,
     subscriptions: Arc<DashMap<String, broadcast::Sender<MqttMessage>>>,
 }
 
@@ -88,17 +94,20 @@ impl MqttHandle {
 
 impl MqttHandle {
     // TODO(@EthanKuai): Max retries timeout + change implementations to expect result.
-    pub fn connect(client_id: &str, config: MqttSettings) -> Self {
-        let host: &str = &config.host;
-        let port: u16 = config.port;
+    pub fn connect(config: MqttSettings) -> Self {
+        let MqttSettings {
+            client_id,
+            host,
+            port,
+        } = config;
 
-        let mut mqttoptions = MqttOptions::new(client_id, host, port);
+        let mut mqttoptions = MqttOptions::new(&client_id, &host, port);
         mqttoptions.set_keep_alive(Duration::from_secs(5));
         tracing::info!(
             "MQTT connecting to {}:{} (client_id={})",
-            host,
+            &host,
             port,
-            client_id
+            &client_id
         );
         let (client, mut eventloop) = AsyncClient::new(mqttoptions, 64);
         let subscriptions: Arc<DashMap<String, broadcast::Sender<MqttMessage>>> =
@@ -128,7 +137,7 @@ impl MqttHandle {
             }
         });
         Self {
-            client,
+            client: Arc::new(client),
             subscriptions,
         }
     }
