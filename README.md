@@ -2,21 +2,6 @@
 
 **RMF2 Task Orchestrator** is a workflow executor for multi-robot task coordination, built on top of [Bevy ECS](https://bevy.org/learn/quick-start/getting-started/ecs/) and [OpenRMF's Crossflow](https://github.com/open-rmf/crossflow).
 
-
-## Within the RMF2 Stack
-```mermaid
-flowchart LR
-  TO["`<font color="#ff0000">Task Orchestrator<br/>(what to do)</font>`"]:::outline
-  MAPF["MAPF<br/>(where to go)"]
-  V["VDA5050<br/>(talk to robots)"]
-  SIM["Simulation<br/>(the robots)"]
-  classDef outline stroke:#ff0000
-  TO --> MAPF --> V --> SIM
-  SIM -. state .-> V -. state .-> TO
-```
-
-More information on how Task Orchestrator integrates into the full RMF2 stack [here](https://dev.rmf-industrial.org/latest/guide/architecture.html).
-
 ## Getting Started
 
 **Prerequisites:** 
