@@ -8,7 +8,7 @@ Publishes a task request to instruct an asset to perform a specific task. The me
 | type | string | Message type. Always `"TaskRequest"` |
 | id | string | Unique task identifier (URN format) |
 | task_type | string | Type of task to perform (eg. `"Depalletize"`, `"Store"`) |
-| task_command | string | Command to execute (eg. `"START"`, `"STOP"`, `"CANCEL"`) |
+| task_command | string | Command to execute (eg. `"START"`, `"STOP"`, `"CANCEL"`, `"PAUSE"`, `"RESUME"`) |
 | asset_id | string | Target asset/device identifier |
 | task_params | object | Task-specific parameters |
 | timestamp | string | ISO 8601 timestamp of the request |
@@ -45,6 +45,9 @@ Assets publish task status messages to report the outcome or progress of a reque
 | timestamp | string | ISO 8601 timestamp of the status update |
 | task_expected_start | string | Expected start time |
 | task_expected_end | string | Expected end time |
+
+> [!NOTE]
+> `status` state values are not finalized and is subject to change.
 
 Payload:
 ```json

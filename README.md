@@ -18,7 +18,7 @@ curl -X POST http://localhost:2727/api/executor/run \
   -d '{"diagram": '"$(cat diagrams/mqtt_examples/mqtt_listen_consume.json)"', "request": {}}'
 ```
 
-Alternatively, the workflow can be ran on the [live editor](http://localhost:2727)
+Alternatively, the workflow can be edited and run on the live editor at <http://localhost:2727>.
 
 ![Diagram Editor](docs/images/diagram_editor_example.png)
 
@@ -26,12 +26,13 @@ Alternatively, the workflow can be ran on the [live editor](http://localhost:272
 ### Documentation
 
 - **Platform**: Ubuntu 22.04+
+- **Protocol Support**: MQTT, AMQP
 
-Task Orchestrator
+Detailed Documentation
 
-- [Interfaces (TaskRequest, TaskStatus, AMQP Consumer)](./docs/interfaces.md)
+- [Task Interfaces](./docs/interfaces.md)
 
-- [Node Types (AMQP, MQTT, Utility)](./docs/nodes.md)
+- [Node Types](./docs/nodes.md)
 
 ### License
 
