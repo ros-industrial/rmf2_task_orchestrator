@@ -390,9 +390,9 @@ fn mqtt_device_req_node(
                 config.task_type,
             );
 
-            let status_topic = format!("asset/{}/asset_status", &config.asset_id);
-            let request_topic = format!("asset/{}/task_request", &config.asset_id);
-            let response_topic = format!("asset/{}/task_status", &config.asset_id);
+            let status_topic = format!("asset/{}/asset_status", config.asset_id);
+            let request_topic = format!("asset/{}/task_request", config.asset_id);
+            let response_topic = format!("asset/{}/task_status", config.asset_id);
 
             let mut status_rx = mqtt
                 .subscribe(&status_topic, 0)
@@ -545,7 +545,9 @@ mod tests {
         .unwrap();
 
         let result = ctx.command(|cmds| {
-            pub_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+            pub_diagram
+                .spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+                .map_err(Box::new)
         });
         assert!(
             result.is_ok(),
@@ -578,7 +580,9 @@ mod tests {
         .unwrap();
 
         let result = ctx.command(|cmds| {
-            sub_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+            sub_diagram
+                .spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+                .map_err(Box::new)
         });
         assert!(
             result.is_ok(),
@@ -610,7 +614,9 @@ mod tests {
         .unwrap();
 
         let result = ctx.command(|cmds| {
-            listen_diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+            listen_diagram
+                .spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+                .map_err(Box::new)
         });
         assert!(
             result.is_ok(),
@@ -700,7 +706,11 @@ mod tests {
         .unwrap();
 
         let service = ctx
-            .command(|cmds| diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry))
+            .command(|cmds| {
+                diagram
+                    .spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+                    .map_err(Box::new)
+            })
             .expect("MqttListen diagram build failed");
 
         let mut outcome = ctx.command(|cmds| cmds.request(json!({}), service).outcome());
@@ -772,7 +782,11 @@ mod tests {
         .unwrap();
 
         let service = ctx
-            .command(|cmds| diagram.spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry))
+            .command(|cmds| {
+                diagram
+                    .spawn_io_workflow::<JsonMessage, JsonMessage>(cmds, &registry)
+                    .map_err(Box::new)
+            })
             .expect("Diagram build failed");
 
         let mut outcome = ctx.command(|cmds| cmds.request(json!({}), service).outcome());
