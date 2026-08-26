@@ -11,12 +11,14 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
+ENV PNPM_VERSION=11
+ENV NODE_VERSION=22
 RUN apt-get update && apt-get install -y \
     curl clang pkg-config libssl-dev ca-certificates gnupg \
-    && curl -sSL https://deb.nodesource.com/setup_22.x | bash - \
+    && curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
     && apt-get install -y nodejs \
+    && curl -fsSL https://get.pnpm.io/install.sh | bash - \
     && rm -rf /var/lib/apt/lists/*
-RUN npm install -g pnpm@11
 
 # Build dependencies to cache in `cache-from/to: type=gha`
 COPY --from=planner /app/recipe.json recipe.json
