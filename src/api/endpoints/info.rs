@@ -36,3 +36,28 @@ pub async fn info() -> axum::Json<InfoResponse> {
         api_version: "v1",
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn info_returns_package_version_and_v1_api() {
+        let axum::Json(resp) = info().await;
+        assert_eq!(resp.service_version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(resp.api_version, "v1");
+    }
+
+    #[test]
+    fn info_response_serializes_to_expected_json() {
+        let resp = InfoResponse {
+            service_version: "1.2.3",
+            api_version: "v1",
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({"service_version": "1.2.3", "api_version": "v1"})
+        );
+    }
+}

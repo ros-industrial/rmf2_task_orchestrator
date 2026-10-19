@@ -162,3 +162,126 @@ pub fn build_openapi_json(base: utoipa::openapi::OpenApi) -> serde_json::Value {
 
     json
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_schema_rewrites_defs_ref() {
+        let mut v = serde_json::json!({"$ref": "#/$defs/Foo"});
+        normalize_schema(&mut v);
+        assert_eq!(v["$ref"], "#/components/schemas/Foo");
+    }
+
+    #[test]
+    fn normalize_schema_leaves_components_ref_untouched() {
+        let mut v = serde_json::json!({"$ref": "#/components/schemas/Bar"});
+        normalize_schema(&mut v);
+        assert_eq!(v["$ref"], "#/components/schemas/Bar");
+    }
+
+    #[test]
+    fn normalize_schema_strips_meta_keywords() {
+        let mut v = serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "urn:example",
+            "$anchor": "root",
+            "type": "object"
+        });
+        normalize_schema(&mut v);
+        assert!(v.get("$schema").is_none());
+        assert!(v.get("$id").is_none());
+        assert!(v.get("$anchor").is_none());
+        assert_eq!(v["type"], "object");
+    }
+
+    #[test]
+    fn normalize_schema_converts_bool_true() {
+        let mut v = serde_json::Value::Bool(true);
+        normalize_schema(&mut v);
+        assert_eq!(v, serde_json::json!({}));
+    }
+
+    #[test]
+    fn normalize_schema_converts_bool_false() {
+        let mut v = serde_json::Value::Bool(false);
+        normalize_schema(&mut v);
+        assert_eq!(v, serde_json::json!({"not": {}}));
+    }
+
+    #[test]
+    fn normalize_schema_recurses_into_nested_objects() {
+        let mut v = serde_json::json!({
+            "properties": {
+                "child": {"$ref": "#/$defs/Child", "$schema": "drop-me"}
+            }
+        });
+        normalize_schema(&mut v);
+        assert_eq!(v["properties"]["child"]["$ref"], "#/components/schemas/Child");
+        assert!(v["properties"]["child"].get("$schema").is_none());
+    }
+
+    #[test]
+    fn collect_defs_extracts_top_level_defs() {
+        let json = serde_json::json!({
+            "$defs": {
+                "Foo": {"type": "string"},
+                "Bar": {"type": "integer"}
+            }
+        });
+        let mut out = serde_json::Map::new();
+        collect_defs(&json, &mut out);
+        assert!(out.contains_key("Foo"));
+        assert!(out.contains_key("Bar"));
+    }
+
+    #[test]
+    fn collect_defs_does_not_overwrite_existing_entry() {
+        let json = serde_json::json!({"$defs": {"Foo": {"type": "string"}}});
+        let mut out = serde_json::Map::new();
+        out.insert("Foo".into(), serde_json::json!({"type": "number"}));
+        collect_defs(&json, &mut out);
+        assert_eq!(out["Foo"]["type"], "number");
+    }
+
+    #[test]
+    fn build_openapi_json_injects_schemars_schemas() {
+        use utoipa::OpenApi;
+
+        #[derive(OpenApi)]
+        #[openapi()]
+        struct MinimalDoc;
+
+        let result = build_openapi_json(MinimalDoc::openapi());
+        let schemas = &result["components"]["schemas"];
+        assert!(schemas.is_object(), "components.schemas must be an object");
+        assert!(
+            schemas.get("PostRunRequest").is_some(),
+            "PostRunRequest schema must be present"
+        );
+        assert!(
+            schemas.get("DiagramElementMetadata").is_some(),
+            "DiagramElementMetadata schema must be present"
+        );
+    }
+
+    #[test]
+    fn build_openapi_json_merges_with_existing_schemas() {
+        use utoipa::OpenApi;
+
+        #[derive(utoipa::ToSchema)]
+        struct MyType {
+            _x: i32,
+        }
+
+        #[derive(OpenApi)]
+        #[openapi(components(schemas(MyType)))]
+        struct DocWithSchema;
+
+        let result = build_openapi_json(DocWithSchema::openapi());
+        let schemas = &result["components"]["schemas"];
+        assert!(schemas.get("MyType").is_some(), "utoipa schema must be kept");
+        assert!(schemas.get("PostRunRequest").is_some(), "injected schema must also be present");
+    }
+}

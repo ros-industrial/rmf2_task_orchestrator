@@ -32,3 +32,21 @@ pub struct HealthResponse {
 pub async fn health_check() -> axum::Json<HealthResponse> {
     axum::Json(HealthResponse { status: "ok" })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn health_check_returns_ok_status() {
+        let axum::Json(resp) = health_check().await;
+        assert_eq!(resp.status, "ok");
+    }
+
+    #[test]
+    fn health_response_serializes_to_expected_json() {
+        let resp = HealthResponse { status: "ok" };
+        let json = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json, serde_json::json!({"status": "ok"}));
+    }
+}
