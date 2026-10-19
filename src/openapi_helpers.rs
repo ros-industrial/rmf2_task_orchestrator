@@ -1,0 +1,164 @@
+/*
+ * Copyright (C) 2026 ROS-Industrial Consortium Asia Pacific
+ * Advanced Remanufacturing and Technology Centre
+ * A*STAR Research Entities (Co. Registration No. 199702110H)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+use utoipa::openapi::RefOr;
+
+/// Minimal newtype wrapper: gives utoipa the correct schema name for $ref
+/// generation in operation annotations.  The actual schema content is
+/// injected into the served OpenAPI JSON by `build_openapi_json` via schemars.
+macro_rules! bridge_schema {
+    ($wrapper:ident, $name:literal) => {
+        pub struct $wrapper;
+
+        impl utoipa::PartialSchema for $wrapper {
+            fn schema() -> RefOr<utoipa::openapi::schema::Schema> {
+                RefOr::T(utoipa::openapi::schema::Schema::Object(
+                    utoipa::openapi::schema::ObjectBuilder::new().build(),
+                ))
+            }
+        }
+
+        impl utoipa::ToSchema for $wrapper {
+            fn name() -> std::borrow::Cow<'static, str> {
+                std::borrow::Cow::Borrowed($name)
+            }
+        }
+    };
+}
+
+bridge_schema!(PostRunRequestDoc, "PostRunRequest");
+bridge_schema!(DiagramElementMetadataDoc, "DiagramElementMetadata");
+
+// ── OpenAPI JSON patching ────────────────────────────────────────────────────
+
+/// Rewrites `#/$defs/Foo` refs to `#/components/schemas/Foo`, converts
+/// boolean schemas to their object equivalents, and strips JSON Schema
+/// 2020-12 meta-keywords that OpenAPI tooling doesn't understand.
+fn normalize_schema(v: &mut serde_json::Value) {
+    match v {
+        serde_json::Value::Bool(true) => *v = serde_json::json!({}),
+        serde_json::Value::Bool(false) => *v = serde_json::json!({"not": {}}),
+        serde_json::Value::Object(map) => {
+            if let Some(r) = map.get_mut("$ref") {
+                if let Some(s) = r.as_str() {
+                    if let Some(name) = s.strip_prefix("#/$defs/") {
+                        *r = serde_json::Value::String(format!("#/components/schemas/{name}"));
+                    }
+                }
+            }
+            for key in &[
+                "$schema",
+                "$id",
+                "$anchor",
+                "$dynamicAnchor",
+                "$dynamicRef",
+                "$vocabulary",
+                "$comment",
+            ] {
+                map.remove(*key);
+            }
+            for val in map.values_mut() {
+                normalize_schema(val);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for val in arr.iter_mut() {
+                normalize_schema(val);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Recursively extracts all `$defs` entries into `out` (normalizing as it
+/// goes), so every nested sub-schema ends up as a top-level component.
+fn collect_defs(
+    json: &serde_json::Value,
+    out: &mut serde_json::Map<String, serde_json::Value>,
+) {
+    if let Some(defs) = json
+        .as_object()
+        .and_then(|o| o.get("$defs"))
+        .and_then(|d| d.as_object())
+    {
+        for (name, schema) in defs {
+            if out.contains_key(name) {
+                continue;
+            }
+            let mut s = schema.clone();
+            normalize_schema(&mut s);
+            collect_defs(&s.clone(), out);
+            out.insert(name.clone(), s);
+        }
+    }
+}
+
+fn inject_schemars_schemas(schemas: &mut serde_json::Map<String, serde_json::Value>) {
+    let roots: &[(&str, serde_json::Value)] = &[
+        (
+            "PostRunRequest",
+            serde_json::to_value(schemars::schema_for!(
+                crossflow_diagram_editor::api::executor::PostRunRequest
+            ))
+            .unwrap_or_default(),
+        ),
+        (
+            "DiagramElementMetadata",
+            serde_json::to_value(schemars::schema_for!(crossflow::DiagramElementMetadata))
+                .unwrap_or_default(),
+        ),
+    ];
+
+    for (root_name, raw) in roots {
+        let mut json = raw.clone();
+        normalize_schema(&mut json);
+
+        let mut defs = serde_json::Map::new();
+        collect_defs(&json, &mut defs);
+        schemas.extend(defs);
+
+        if let Some(obj) = json.as_object_mut() {
+            obj.remove("$defs");
+        }
+        schemas.insert(root_name.to_string(), json);
+    }
+}
+
+/// Builds the OpenAPI JSON spec: starts from utoipa's path/operation metadata
+/// then injects real schemars-generated schemas into `components.schemas`.
+pub fn build_openapi_json(base: utoipa::openapi::OpenApi) -> serde_json::Value {
+    let mut json = serde_json::to_value(base).unwrap_or_default();
+
+    let mut extra = serde_json::Map::new();
+    inject_schemars_schemas(&mut extra);
+
+    if let Some(obj) = json.as_object_mut() {
+        let schemas = obj
+            .entry("components")
+            .or_insert_with(|| serde_json::json!({}))
+            .as_object_mut()
+            .unwrap()
+            .entry("schemas")
+            .or_insert_with(|| serde_json::json!({}))
+            .as_object_mut()
+            .unwrap();
+        schemas.extend(extra);
+    }
+
+    json
+}

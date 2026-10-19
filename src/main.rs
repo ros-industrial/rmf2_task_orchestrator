@@ -16,15 +16,48 @@
  * limitations under the License.
  */
 
-use axum::{http::StatusCode, routing::get};
+mod api;
+mod openapi_helpers;
+
+use api::endpoints::{
+    health::{health_check, HealthResponse},
+    info::{info, InfoResponse},
+};
+use axum::{Router, routing::get};
+use openapi_helpers::{DiagramElementMetadataDoc, PostRunRequestDoc};
 use rmf2_task_orchestrator::client;
-use rmf2_task_orchestrator::config::{Settings, load_base_configuration};
+use rmf2_task_orchestrator::config::{Environment, Settings, load_base_configuration};
 use rmf2_task_orchestrator::{create_amqp_router, spawn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
-async fn health_check() -> StatusCode {
-    StatusCode::OK
-}
+#[derive(OpenApi)]
+#[openapi(
+    info(title = "RMF2 Task Orchestrator", version = "0.1.0"),
+    servers(
+        (url = "/", description = "Local server")
+    ),
+    tags(
+        (name = "health", description = "Service health"),
+        (name = "crossflow", description = "Crossflow diagram editor and workflow executor"),
+    ),
+    paths(
+        api::endpoints::health::health_check,
+        api::endpoints::info::info,
+        api::endpoints::executor::run,
+        api::endpoints::registry::registry,
+    ),
+    components(schemas(
+        HealthResponse,
+        InfoResponse,
+        PostRunRequestDoc,
+        DiagramElementMetadataDoc,
+    ))
+)]
+struct ApiDoc;
+
+// ── Entry point ──────────────────────────────────────────────────────────────
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -56,7 +89,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         amqp_router,
     ));
 
-    let app = editor_router.route("/health_check", get(health_check));
+    let mut app: Router = editor_router
+        .route("/api/health", get(health_check))
+        .route("/api/info", get(info));
+    if !Environment::from_env().is_production() {
+        app = app.merge(
+            SwaggerUi::new("/swagger-ui").external_url_unchecked(
+                utoipa_swagger_ui::Url::new("RMF2 Task Orchestrator", "/api-docs/openapi.json"),
+                openapi_helpers::build_openapi_json(ApiDoc::openapi()),
+            ),
+        );
+    }
 
     let listener = tokio::net::TcpListener::bind(http_config.addr())
         .await
@@ -65,7 +108,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let local_addr = listener.local_addr()?;
     tracing::info!("Server listening on: http://{}", local_addr);
     tracing::info!("Diagram editor: http://{}/", local_addr);
+    tracing::info!("Health: GET http://{}/api/health", local_addr);
     tracing::info!("Executor API: POST http://{}/api/executor/run", local_addr);
+    if !Environment::from_env().is_production() {
+        tracing::info!("Swagger UI: http://{}/swagger-ui/", local_addr);
+    }
     axum::serve(listener, app).await?;
 
     Ok(())
