@@ -54,12 +54,11 @@ fn normalize_schema(v: &mut serde_json::Value) {
         serde_json::Value::Bool(true) => *v = serde_json::json!({}),
         serde_json::Value::Bool(false) => *v = serde_json::json!({"not": {}}),
         serde_json::Value::Object(map) => {
-            if let Some(r) = map.get_mut("$ref") {
-                if let Some(s) = r.as_str() {
-                    if let Some(name) = s.strip_prefix("#/$defs/") {
-                        *r = serde_json::Value::String(format!("#/components/schemas/{name}"));
-                    }
-                }
+            if let Some(r) = map.get_mut("$ref")
+                && let Some(s) = r.as_str()
+                && let Some(name) = s.strip_prefix("#/$defs/")
+            {
+                *r = serde_json::Value::String(format!("#/components/schemas/{name}"));
             }
             for key in &[
                 "$schema",
