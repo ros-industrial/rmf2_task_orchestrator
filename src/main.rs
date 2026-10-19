@@ -20,8 +20,8 @@ mod api;
 mod openapi_helpers;
 
 use api::endpoints::{
-    health::{health_check, HealthResponse},
-    info::{info, InfoResponse},
+    health::{HealthResponse, health_check},
+    info::{InfoResponse, info},
 };
 use axum::{Router, routing::get};
 use openapi_helpers::{DiagramElementMetadataDoc, PostRunRequestDoc};
@@ -93,12 +93,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/health", get(health_check))
         .route("/api/info", get(info));
     if !Environment::from_env().is_production() {
-        app = app.merge(
-            SwaggerUi::new("/swagger-ui").external_url_unchecked(
-                utoipa_swagger_ui::Url::new("RMF2 Task Orchestrator", "/api-docs/openapi.json"),
-                openapi_helpers::build_openapi_json(ApiDoc::openapi()),
-            ),
-        );
+        app = app.merge(SwaggerUi::new("/swagger-ui").external_url_unchecked(
+            utoipa_swagger_ui::Url::new("RMF2 Task Orchestrator", "/api-docs/openapi.json"),
+            openapi_helpers::build_openapi_json(ApiDoc::openapi()),
+        ));
     }
 
     let listener = tokio::net::TcpListener::bind(http_config.addr())

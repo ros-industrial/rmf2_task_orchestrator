@@ -87,10 +87,7 @@ fn normalize_schema(v: &mut serde_json::Value) {
 
 /// Recursively extracts all `$defs` entries into `out` (normalizing as it
 /// goes), so every nested sub-schema ends up as a top-level component.
-fn collect_defs(
-    json: &serde_json::Value,
-    out: &mut serde_json::Map<String, serde_json::Value>,
-) {
+fn collect_defs(json: &serde_json::Value, out: &mut serde_json::Map<String, serde_json::Value>) {
     if let Some(defs) = json
         .as_object()
         .and_then(|o| o.get("$defs"))
@@ -218,7 +215,10 @@ mod tests {
             }
         });
         normalize_schema(&mut v);
-        assert_eq!(v["properties"]["child"]["$ref"], "#/components/schemas/Child");
+        assert_eq!(
+            v["properties"]["child"]["$ref"],
+            "#/components/schemas/Child"
+        );
         assert!(v["properties"]["child"].get("$schema").is_none());
     }
 
@@ -281,7 +281,13 @@ mod tests {
 
         let result = build_openapi_json(DocWithSchema::openapi());
         let schemas = &result["components"]["schemas"];
-        assert!(schemas.get("MyType").is_some(), "utoipa schema must be kept");
-        assert!(schemas.get("PostRunRequest").is_some(), "injected schema must also be present");
+        assert!(
+            schemas.get("MyType").is_some(),
+            "utoipa schema must be kept"
+        );
+        assert!(
+            schemas.get("PostRunRequest").is_some(),
+            "injected schema must also be present"
+        );
     }
 }
