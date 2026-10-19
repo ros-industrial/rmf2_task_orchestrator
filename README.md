@@ -4,8 +4,8 @@
 
 ## Getting Started
 
-**Prerequisites:** 
-- If running locally: 
+**Prerequisites:**
+- If running locally:
   - Install & run MQTT broker (eg.[Mosquitto](https://mosquitto.org/download/))
 
   - Install & run AMQP server (eg. [RabbitMQ](https://www.rabbitmq.com/docs/download))
@@ -27,6 +27,8 @@ curl -X POST http://localhost:2727/api/executor/run \
 ```
 
 Alternatively, the workflow can be edited and run on the live editor at <http://localhost:2727>.
+
+The REST API is documented at <http://localhost:2727/swagger-ui/>.
 
 ![Diagram Editor](docs/images/diagram_editor_example.png)
 
