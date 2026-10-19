@@ -109,10 +109,18 @@ fn inject_schemars_schemas(schemas: &mut serde_json::Map<String, serde_json::Val
     let roots: &[(&str, serde_json::Value)] = &[
         (
             "PostRunRequest",
-            serde_json::to_value(schemars::schema_for!(
-                crossflow_diagram_editor::api::executor::PostRunRequest
-            ))
-            .unwrap_or_default(),
+            serde_json::json!({
+                "type": "object",
+                "required": ["diagram", "request"],
+                "properties": {
+                    "diagram": { "$ref": "#/components/schemas/Diagram" },
+                    "request": {}
+                }
+            }),
+        ),
+        (
+            "Diagram",
+            serde_json::to_value(schemars::schema_for!(crossflow::Diagram)).unwrap_or_default(),
         ),
         (
             "DiagramElementMetadata",
