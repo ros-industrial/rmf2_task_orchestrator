@@ -27,7 +27,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY . .
 # Not cached; cargo builds package
-RUN cargo build --locked --release
+RUN BUILD_FRONTEND=1 cargo build --locked --release
 
 FROM ${RUNTIME_IMAGE} AS runtime
 WORKDIR /app
