@@ -50,6 +50,8 @@ jobs:
 
       # Cache reused across all runs
       - name: clippy
+        env:
+          BUILD_FRONTEND: "1"
         run: cargo clippy --workspace --locked --all-targets --all-features -- -D warnings
 
       # Future-proof: check features + multiple crates
