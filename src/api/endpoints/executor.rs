@@ -16,7 +16,10 @@
  * limitations under the License.
  */
 
-use crate::openapi_helpers::PostRunRequestDoc;
+use crate::openapi_helpers::{
+    CompatibilityRequestDoc, CompatibilityResponseDoc, InteractionSessionMessageDoc,
+    PostRunRequestDoc,
+};
 
 #[utoipa::path(
     post,
@@ -31,3 +34,27 @@ use crate::openapi_helpers::PostRunRequestDoc;
 )]
 #[allow(dead_code)]
 pub async fn run() {}
+
+#[utoipa::path(
+    post,
+    path = "/api/executor/compatibility",
+    tag = "crossflow",
+    request_body = CompatibilityRequestDoc,
+    responses(
+        (status = 200, description = "Compatibility results for each requested connection", body = CompatibilityResponseDoc),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[allow(dead_code)]
+pub async fn compatibility() {}
+
+#[utoipa::path(
+    get,
+    path = "/api/executor/interaction",
+    tag = "crossflow",
+    responses(
+        (status = 101, description = "Upgrades to WebSocket; client sends a PostRunRequest JSON text frame to start the workflow; server sends InteractionSessionMessage JSON text frames (feedback events and a final finish frame)", body = InteractionSessionMessageDoc),
+    )
+)]
+#[allow(dead_code)]
+pub async fn interaction() {}

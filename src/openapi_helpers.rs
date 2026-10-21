@@ -43,6 +43,9 @@ macro_rules! bridge_schema {
 
 bridge_schema!(PostRunRequestDoc, "PostRunRequest");
 bridge_schema!(DiagramElementMetadataDoc, "DiagramElementMetadata");
+bridge_schema!(CompatibilityRequestDoc, "CompatibilityRequest");
+bridge_schema!(CompatibilityResponseDoc, "CompatibilityResponse");
+bridge_schema!(InteractionSessionMessageDoc, "InteractionSessionMessage");
 
 // ── OpenAPI JSON patching ────────────────────────────────────────────────────
 
@@ -125,6 +128,29 @@ fn inject_schemars_schemas(schemas: &mut serde_json::Map<String, serde_json::Val
             "DiagramElementMetadata",
             serde_json::to_value(schemars::schema_for!(crossflow::DiagramElementMetadata))
                 .unwrap_or_default(),
+        ),
+        (
+            "CompatibilityRequest",
+            serde_json::to_value(
+                schemars::schema_for!(crossflow_diagram_editor::api::executor::CompatibilityRequest),
+            )
+            .unwrap_or_default(),
+        ),
+        (
+            "CompatibilityResponse",
+            serde_json::to_value(
+                schemars::schema_for!(crossflow_diagram_editor::api::executor::CompatibilityResponse),
+            )
+            .unwrap_or_default(),
+        ),
+        (
+            "InteractionSessionMessage",
+            serde_json::to_value(
+                schemars::schema_for!(
+                    crossflow_diagram_editor::api::executor::InteractionSessionMessage
+                ),
+            )
+            .unwrap_or_default(),
         ),
     ];
 
@@ -270,6 +296,34 @@ mod tests {
         assert!(
             schemas.get("DiagramElementMetadata").is_some(),
             "DiagramElementMetadata schema must be present"
+        );
+        assert!(
+            schemas.get("CompatibilityRequest").is_some(),
+            "CompatibilityRequest schema must be present"
+        );
+        assert!(
+            schemas.get("CompatibilityResponse").is_some(),
+            "CompatibilityResponse schema must be present"
+        );
+        assert!(
+            schemas.get("CompatibilityConnection").is_some(),
+            "CompatibilityConnection schema must be present"
+        );
+        assert!(
+            schemas.get("CompatibilityResult").is_some(),
+            "CompatibilityResult schema must be present"
+        );
+        assert!(
+            schemas.get("CompatibilityStatus").is_some(),
+            "CompatibilityStatus schema must be present"
+        );
+        assert!(
+            schemas.get("InteractionSessionMessage").is_some(),
+            "InteractionSessionMessage schema must be present"
+        );
+        assert!(
+            schemas.get("PortRef").is_some(),
+            "PortRef schema must be present"
         );
     }
 

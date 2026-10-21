@@ -24,7 +24,10 @@ use api::endpoints::{
     info::{InfoResponse, info},
 };
 use axum::{Router, routing::get};
-use openapi_helpers::{DiagramElementMetadataDoc, PostRunRequestDoc};
+use openapi_helpers::{
+    CompatibilityRequestDoc, CompatibilityResponseDoc, DiagramElementMetadataDoc,
+    InteractionSessionMessageDoc, PostRunRequestDoc,
+};
 use rmf2_task_orchestrator::client;
 use rmf2_task_orchestrator::config::{Environment, Settings, load_base_configuration};
 use rmf2_task_orchestrator::{create_amqp_router, spawn};
@@ -46,6 +49,8 @@ use utoipa_swagger_ui::SwaggerUi;
         api::endpoints::health::health_check,
         api::endpoints::info::info,
         api::endpoints::executor::run,
+        api::endpoints::executor::compatibility,
+        api::endpoints::executor::interaction,
         api::endpoints::registry::registry,
     ),
     components(schemas(
@@ -53,6 +58,9 @@ use utoipa_swagger_ui::SwaggerUi;
         InfoResponse,
         PostRunRequestDoc,
         DiagramElementMetadataDoc,
+        CompatibilityRequestDoc,
+        CompatibilityResponseDoc,
+        InteractionSessionMessageDoc,
     ))
 )]
 struct ApiDoc;
