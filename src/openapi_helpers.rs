@@ -131,25 +131,23 @@ fn inject_schemars_schemas(schemas: &mut serde_json::Map<String, serde_json::Val
         ),
         (
             "CompatibilityRequest",
-            serde_json::to_value(
-                schemars::schema_for!(crossflow_diagram_editor::api::executor::CompatibilityRequest),
-            )
+            serde_json::to_value(schemars::schema_for!(
+                crossflow_diagram_editor::api::executor::CompatibilityRequest
+            ))
             .unwrap_or_default(),
         ),
         (
             "CompatibilityResponse",
-            serde_json::to_value(
-                schemars::schema_for!(crossflow_diagram_editor::api::executor::CompatibilityResponse),
-            )
+            serde_json::to_value(schemars::schema_for!(
+                crossflow_diagram_editor::api::executor::CompatibilityResponse
+            ))
             .unwrap_or_default(),
         ),
         (
             "InteractionSessionMessage",
-            serde_json::to_value(
-                schemars::schema_for!(
-                    crossflow_diagram_editor::api::executor::InteractionSessionMessage
-                ),
-            )
+            serde_json::to_value(schemars::schema_for!(
+                crossflow_diagram_editor::api::executor::InteractionSessionMessage
+            ))
             .unwrap_or_default(),
         ),
     ];
