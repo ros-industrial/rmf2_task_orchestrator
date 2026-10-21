@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Build dependencies to cache in `cache-from/to: type=gha`
 COPY --from=planner /app/recipe.json recipe.json
-RUN BUILD_FRONTEND=1 cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 # Only built dependencies cached
 
 COPY . .
