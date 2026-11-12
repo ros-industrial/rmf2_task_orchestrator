@@ -7,8 +7,8 @@ edition = "2024"
 axum = "0.8.6"
 cel-interpreter = "0.10.0"
 config = "0.15.19"
-crossflow = { git = "https://github.com/open-rmf/crossflow.git", branch = "main", features = ["diagram"] }
-crossflow_diagram_editor = { git = "https://github.com/open-rmf/crossflow.git", branch = "main", features = ["frontend", "router"] }
+crossflow = { version = "0.0.7", features = ["diagram"] }
+crossflow_diagram_editor = { version = "0.0.7", features = ["frontend", "router"] }
 dashmap = "6.1.0"
 dotenvy = "0.15.7"
 futures-lite = "2.6"
