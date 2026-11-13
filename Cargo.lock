@@ -3053,6 +3053,7 @@ dependencies = [
  "futures-lite",
  "futures-timer",
  "lapin",
+ "paste",
  "reqwest",
  "rumqttc",
  "schemars 1.2.1",

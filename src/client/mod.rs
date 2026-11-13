@@ -17,5 +17,6 @@
  */
 
 mod clients;
+pub mod protocol;
 pub use clients::amqp::{AmqpClient, AmqpConnection, AmqpRouter, run_consumer};
 pub(crate) use clients::*;
