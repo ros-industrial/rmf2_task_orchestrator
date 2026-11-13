@@ -84,6 +84,10 @@ impl Environment {
             _ => Self::Development,
         }
     }
+    pub fn is_production(&self) -> bool {
+        matches!(self, Self::Production)
+    }
+
     pub fn load_env_file(&self) -> &'static str {
         match self {
             Self::Production => ".env.production",
